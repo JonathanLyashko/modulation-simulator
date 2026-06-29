@@ -1,5 +1,7 @@
 'use client';
 
+import type { MessageComponent } from "@/app/components/workspace/types";
+
 type DspModule = {
   cwrap: <T extends (...args: number[]) => number | void>(
     name: string,
@@ -15,6 +17,19 @@ type DspExports = {
   getSignalLength(signalId: number): number;
   getSignalSampleRate(signalId: number): number;
   getSignalSample(signalId: number, sampleIndex: number): number;
+  clearSignal(signalId: number): void;
+  addSineComponent(
+    signalId: number,
+    amplitude: number,
+    frequency: number,
+    phase: number
+  ): void;
+  addCosineComponent(
+    signalId: number,
+    amplitude: number,
+    frequency: number,
+    phase: number
+  ): void;
   amModulate(
     messageSignalId: number,
     carrierFrequency: number,
@@ -80,6 +95,19 @@ export async function createDspClient(): Promise<DspExports> {
     getSignalLength: wasmModule.cwrap("dsp_get_signal_length", "number", ["number"]),
     getSignalSampleRate: wasmModule.cwrap("dsp_get_signal_sample_rate", "number", ["number"]),
     getSignalSample: wasmModule.cwrap("dsp_get_signal_sample", "number", [
+      "number",
+      "number",
+    ]),
+    clearSignal: wasmModule.cwrap("dsp_clear_signal", null, ["number"]),
+    addSineComponent: wasmModule.cwrap("dsp_add_sine_component", null, [
+      "number",
+      "number",
+      "number",
+      "number",
+    ]),
+    addCosineComponent: wasmModule.cwrap("dsp_add_cosine_component", null, [
+      "number",
+      "number",
       "number",
       "number",
     ]),
@@ -198,9 +226,7 @@ export async function generateCarrierSnapshot(options?: {
 export async function generateDsbLcBundle(options?: {
   length?: number;
   sampleRate?: number;
-  messageAmplitude?: number;
-  messageFrequency?: number;
-  messagePhase?: number;
+  messageComponents?: MessageComponent[];
   carrierAmplitude?: number;
   carrierFrequency?: number;
   carrierPhase?: number;
@@ -209,9 +235,7 @@ export async function generateDsbLcBundle(options?: {
   const {
     length = 4096,
     sampleRate = 4096,
-    messageAmplitude = 1,
-    messageFrequency = 1,
-    messagePhase = 0,
+    messageComponents = [],
     carrierAmplitude = 1,
     carrierFrequency = 1000,
     carrierPhase = 0,
@@ -234,7 +258,25 @@ export async function generateDsbLcBundle(options?: {
     throw new Error("Failed to allocate AM signals in the WASM module.");
   }
 
-  dsp.generateCarrier(messageSignalId, messageAmplitude, messageFrequency, messagePhase);
+  dsp.clearSignal(messageSignalId);
+  for (const component of messageComponents) {
+    if (component.type === "sine") {
+      dsp.addSineComponent(
+        messageSignalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    } else {
+      dsp.addCosineComponent(
+        messageSignalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    }
+  }
+
   dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
   const modulatedSignalId = dsp.amModulate(

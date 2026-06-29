@@ -28,6 +28,36 @@ float dsp_get_signal_sample(int signal_id, int sample_index) {
     return getSignalSample(signal_id, sample_index);
 }
 
+void dsp_clear_signal(int signal_id) {
+    zeroSignalSamples(signal_id);
+}
+
+void dsp_add_sine_component(
+    int signal_id,
+    float amplitude,
+    float frequency,
+    float phase
+) {
+    addSineComponent(signal_id, AdditiveToneParameters{
+        amplitude,
+        frequency,
+        phase,
+    });
+}
+
+void dsp_add_cosine_component(
+    int signal_id,
+    float amplitude,
+    float frequency,
+    float phase
+) {
+    addCosineComponent(signal_id, AdditiveToneParameters{
+        amplitude,
+        frequency,
+        phase,
+    });
+}
+
 void dsp_generate_carrier(
     int signal_id,
     float carrier_amplitude,

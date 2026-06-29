@@ -120,7 +120,16 @@ export default function BlockCanvas({
   selectedSignalView,
   onSelectSignalView,
 }: BlockCanvasProps) {
-  const messageExpression = `m(t) = ${settings.message.amplitude.toFixed(2)} cos(2pi ${formatFrequencyLabel(settings.message.frequency)} t)`;
+  const messageExpression =
+    settings.messageComponents.length === 0
+      ? "m(t) = 0"
+      : `m(t) = ${settings.messageComponents
+          .slice(0, 2)
+          .map((component) => {
+            const basis = component.type === "sine" ? "sin" : "cos";
+            return `${component.amplitude.toFixed(2)} ${basis}(2pi ${formatFrequencyLabel(component.frequency)} t)`;
+          })
+          .join(" + ")}${settings.messageComponents.length > 2 ? " + ..." : ""}`;
   const carrierExpression = `c(t) = ${settings.carrier.amplitude.toFixed(2)} cos(2pi ${formatFrequencyLabel(settings.carrier.frequency)} t)`;
   const modulatedExpression = `u(t) = A_c [1 + a m_n(t)] cos(2pi f_c t)`;
 

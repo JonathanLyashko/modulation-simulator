@@ -1,4 +1,4 @@
-import type { ModulatorSettings, PlotSettings } from "./types";
+import type { MessageComponent, ModulatorSettings, PlotSettings } from "./types";
 
 export const DEFAULT_MESSAGE_AMPLITUDE = 1;
 export const DEFAULT_MESSAGE_FREQUENCY = 1;
@@ -9,12 +9,18 @@ export const SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE = 32;
 export const DEFAULT_X_SCALE_SECONDS_PER_DIVISION = DISPLAY_WINDOW_SECONDS / 10;
 export const DEFAULT_Y_SCALE_VOLTS_PER_DIVISION = 0.5;
 
-export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
-  message: {
+export const DEFAULT_MESSAGE_COMPONENTS: MessageComponent[] = [
+  {
+    id: "message-component-1",
+    type: "cosine",
     amplitude: DEFAULT_MESSAGE_AMPLITUDE,
     frequency: DEFAULT_MESSAGE_FREQUENCY,
     phase: 0,
   },
+];
+
+export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
+  messageComponents: DEFAULT_MESSAGE_COMPONENTS,
   carrier: {
     amplitude: 1,
     frequency: 1_000,

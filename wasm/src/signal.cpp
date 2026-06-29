@@ -1,5 +1,7 @@
 #include "signal.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <memory>
 #include <vector>
 
@@ -134,4 +136,47 @@ bool setSignalSample(int id, int index, float value) {
 
 std::size_t getSignalCount() {
     return gSignals.size();
+}
+
+void zeroSignalSamples(int id) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr) {
+        return;
+    }
+
+    std::fill(signal->samples.begin(), signal->samples.end(), 0.0f);
+}
+
+namespace {
+constexpr float kPi = 3.14159265358979323846f;
+
+bool addToneComponent(
+    int id,
+    const AdditiveToneParameters& parameters,
+    float phaseOffsetRadians
+) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr || signal->sampleRate <= 0) {
+        return false;
+    }
+
+    const float phaseRadians = (parameters.phaseDegrees * kPi / 180.0f) + phaseOffsetRadians;
+    const float angularFrequency =
+        2.0f * kPi * parameters.frequency / static_cast<float>(signal->sampleRate);
+
+    for (std::size_t index = 0; index < signal->samples.size(); ++index) {
+        const float samplePhase = angularFrequency * static_cast<float>(index) + phaseRadians;
+        signal->samples[index] += parameters.amplitude * std::sin(samplePhase);
+    }
+
+    return true;
+}
+}  // namespace
+
+bool addSineComponent(int id, const AdditiveToneParameters& parameters) {
+    return addToneComponent(id, parameters, 0.0f);
+}
+
+bool addCosineComponent(int id, const AdditiveToneParameters& parameters) {
+    return addToneComponent(id, parameters, kPi / 2.0f);
 }

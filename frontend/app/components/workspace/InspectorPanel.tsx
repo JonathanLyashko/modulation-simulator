@@ -3,7 +3,13 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 
-import type { ModulatorSettings, OscillatorSettings, PlotSettings } from "./types";
+import type {
+  MessageComponent,
+  MessageComponentType,
+  ModulatorSettings,
+  OscillatorSettings,
+  PlotSettings,
+} from "./types";
 
 type InspectorPanelProps = {
   settings: ModulatorSettings;
@@ -11,12 +17,17 @@ type InspectorPanelProps = {
   selectedSignalLabel: string;
   isAudioPlaying: boolean;
   audioStatus: string;
+  messageComponents: MessageComponent[];
   onCarrierAmplitudeChange: (value: number) => void;
   onCarrierFrequencyChange: (value: number) => void;
   onCarrierPhaseChange: (value: number) => void;
-  onMessageAmplitudeChange: (value: number) => void;
-  onMessageFrequencyChange: (value: number) => void;
-  onMessagePhaseChange: (value: number) => void;
+  onAddMessageComponent: (type: MessageComponentType) => void;
+  onUpdateMessageComponent: (
+    componentId: string,
+    field: "amplitude" | "frequency" | "phase",
+    value: number
+  ) => void;
+  onRemoveMessageComponent: (componentId: string) => void;
   onModulationIndexChange: (value: number) => void;
   onPlotXScaleChange: (value: number) => void;
   onPlotYScaleChange: (value: number) => void;
@@ -147,7 +158,7 @@ function AmplitudeGauge({
 
 function CollapsibleSection({
   title,
-  defaultExpanded = true,
+  defaultExpanded = false,
   children,
 }: {
   title: string;
@@ -217,18 +228,95 @@ function OscillatorSection({
   );
 }
 
+function MessageComponentEditor({
+  component,
+  canRemove,
+  onUpdate,
+  onRemove,
+}: {
+  component: MessageComponent;
+  canRemove: boolean;
+  onUpdate: (
+    componentId: string,
+    field: "amplitude" | "frequency" | "phase",
+    value: number
+  ) => void;
+  onRemove: (componentId: string) => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <span className="rounded-full bg-[color:var(--ui-primary)]/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-primary)]">
+            {component.type}
+          </span>
+          <span className="text-sm font-medium text-[color:var(--ui-text)]">
+            {component.type === "sine" ? "Sine Component" : "Cosine Component"}
+          </span>
+        </div>
+        {canRemove ? (
+          <button
+            type="button"
+            onClick={() => {
+              onRemove(component.id);
+            }}
+            className="rounded-[2px] border border-[color:var(--ui-outline-variant)] px-2 py-1 text-xs font-medium text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-high)]"
+          >
+            Remove
+          </button>
+        ) : null}
+      </div>
+
+      <RangeField
+        title="Frequency"
+        valueLabel={`${component.frequency.toFixed(component.frequency < 10 ? 1 : 0)} Hz`}
+        min={0.1}
+        max={5000}
+        step={0.1}
+        value={component.frequency}
+        onChange={(value) => {
+          onUpdate(component.id, "frequency", value);
+        }}
+      />
+      <RangeField
+        title="Magnitude"
+        valueLabel={component.amplitude.toFixed(2)}
+        min={0}
+        max={2}
+        step={0.05}
+        value={component.amplitude}
+        onChange={(value) => {
+          onUpdate(component.id, "amplitude", value);
+        }}
+      />
+      <RangeField
+        title="Phase Offset"
+        valueLabel={`${component.phase.toFixed(0)} deg`}
+        min={0}
+        max={360}
+        step={5}
+        value={component.phase}
+        onChange={(value) => {
+          onUpdate(component.id, "phase", value);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function InspectorPanel({
   settings,
   plotSettings,
   selectedSignalLabel,
   isAudioPlaying,
   audioStatus,
+  messageComponents,
   onCarrierAmplitudeChange,
   onCarrierFrequencyChange,
   onCarrierPhaseChange,
-  onMessageAmplitudeChange,
-  onMessageFrequencyChange,
-  onMessagePhaseChange,
+  onAddMessageComponent,
+  onUpdateMessageComponent,
+  onRemoveMessageComponent,
   onModulationIndexChange,
   onPlotXScaleChange,
   onPlotYScaleChange,
@@ -261,14 +349,37 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Message Settings">
-          <OscillatorSection
-            settings={settings.message}
-            frequencyRange={{ min: 0.1, max: 5000 }}
-            frequencyStep={0.1}
-            onAmplitudeChange={onMessageAmplitudeChange}
-            onFrequencyChange={onMessageFrequencyChange}
-            onPhaseChange={onMessagePhaseChange}
-          />
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                onAddMessageComponent("sine");
+              }}
+              className="flex-1 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+            >
+              Add Sine
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                onAddMessageComponent("cosine");
+              }}
+              className="flex-1 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+            >
+              Add Cosine
+            </button>
+          </div>
+          <div className="space-y-3">
+            {messageComponents.map((component) => (
+              <MessageComponentEditor
+                key={component.id}
+                component={component}
+                canRemove={messageComponents.length > 1}
+                onUpdate={onUpdateMessageComponent}
+                onRemove={onRemoveMessageComponent}
+              />
+            ))}
+          </div>
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
@@ -318,7 +429,7 @@ export default function InspectorPanel({
           </button>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Audio Preview" defaultExpanded={false}>
+        <CollapsibleSection title="Audio Preview">
           <div className="space-y-3">
             <div className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-3 py-2">
               <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-text-muted)]">

@@ -8,6 +8,7 @@ import { createDspClient, generateDsbLcBundle } from "@/app/lib/dspClient";
 import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
 import {
+  DEFAULT_MESSAGE_COMPONENTS,
   DEFAULT_MODULATOR_SETTINGS,
   DEFAULT_PLOT_SETTINGS,
   DISPLAY_WINDOW_SECONDS,
@@ -21,11 +22,35 @@ import TopBar from "./TopBar";
 import type {
   AnalogAmplitudeScheme,
   AnalogAngleScheme,
+  MessageComponent,
+  MessageComponentType,
   ModulatorSettings,
   PlotSettings,
   SignalSnapshot,
   SignalView,
 } from "./types";
+
+function cloneDefaultModulatorSettings(): ModulatorSettings {
+  return {
+    ...DEFAULT_MODULATOR_SETTINGS,
+    messageComponents: DEFAULT_MESSAGE_COMPONENTS.map((component) => ({
+      ...component,
+    })),
+    carrier: {
+      ...DEFAULT_MODULATOR_SETTINGS.carrier,
+    },
+  };
+}
+
+function createMessageComponent(type: MessageComponentType, index: number): MessageComponent {
+  return {
+    id: `message-component-${Date.now()}-${index}`,
+    type,
+    amplitude: 0.5,
+    frequency: type === "sine" ? 2 : 1,
+    phase: 0,
+  };
+}
 
 export default function SignalWorkspace() {
   const activeSignalIdsRef = useRef<number[]>([]);
@@ -47,7 +72,7 @@ export default function SignalWorkspace() {
   const [selectedSignalView, setSelectedSignalView] =
     useState<SignalView>("modulated");
   const [settings, setSettings] = useState<ModulatorSettings>(
-    DEFAULT_MODULATOR_SETTINGS
+    cloneDefaultModulatorSettings
   );
   const [plotSettings, setPlotSettings] = useState<PlotSettings>(
     DEFAULT_PLOT_SETTINGS
@@ -62,9 +87,13 @@ export default function SignalWorkspace() {
     DISPLAY_WINDOW_SECONDS,
     plotSettings.xScaleSecondsPerDivision * 10
   );
+  const highestMessageFrequency = settings.messageComponents.reduce(
+    (currentMaximum, component) => Math.max(currentMaximum, component.frequency),
+    0
+  );
   const highestRepresentedFrequency = Math.max(
-    settings.message.frequency,
-    settings.carrier.frequency + settings.message.frequency
+    highestMessageFrequency,
+    settings.carrier.frequency + highestMessageFrequency
   );
   const nyquistMinimumSampleRate = Math.ceil(
     highestRepresentedFrequency * NYQUIST_MULTIPLIER
@@ -92,9 +121,7 @@ export default function SignalWorkspace() {
         const bundle = await generateDsbLcBundle({
           length: sampleCount,
           sampleRate,
-          messageAmplitude: settings.message.amplitude,
-          messageFrequency: settings.message.frequency,
-          messagePhase: settings.message.phase,
+          messageComponents: settings.messageComponents,
           carrierAmplitude: settings.carrier.amplitude,
           carrierFrequency: settings.carrier.frequency,
           carrierPhase: settings.carrier.phase,
@@ -295,7 +322,7 @@ export default function SignalWorkspace() {
           }}
           onReset={() => {
             setIsRunning(true);
-            setSettings(DEFAULT_MODULATOR_SETTINGS);
+            setSettings(cloneDefaultModulatorSettings());
             setPlotSettings(DEFAULT_PLOT_SETTINGS);
           }}
         />
@@ -335,6 +362,7 @@ export default function SignalWorkspace() {
             selectedSignalLabel={selectedSignalLabel}
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
+            messageComponents={settings.messageComponents}
             onCarrierAmplitudeChange={(value) => {
               if (Number.isFinite(value)) {
                 setSettings((current) => ({
@@ -368,38 +396,58 @@ export default function SignalWorkspace() {
                 }));
               }
             }}
-            onMessageAmplitudeChange={(value) => {
-              if (Number.isFinite(value)) {
-                setSettings((current) => ({
-                  ...current,
-                  message: {
-                    ...current.message,
-                    amplitude: Math.max(0.1, Math.min(2, value)),
-                  },
-                }));
-              }
+            onAddMessageComponent={(type) => {
+              setSettings((current) => ({
+                ...current,
+                messageComponents: [
+                  ...current.messageComponents,
+                  createMessageComponent(type, current.messageComponents.length + 1),
+                ],
+              }));
             }}
-            onMessageFrequencyChange={(value) => {
-              if (Number.isFinite(value)) {
-                setSettings((current) => ({
-                  ...current,
-                  message: {
-                    ...current.message,
-                    frequency: Math.max(0.1, Math.min(5000, value)),
-                  },
-                }));
+            onUpdateMessageComponent={(componentId, field, value) => {
+              if (!Number.isFinite(value)) {
+                return;
               }
-            }}
-            onMessagePhaseChange={(value) => {
-              if (Number.isFinite(value)) {
-                setSettings((current) => ({
-                  ...current,
-                  message: {
-                    ...current.message,
+
+              setSettings((current) => ({
+                ...current,
+                messageComponents: current.messageComponents.map((component) => {
+                  if (component.id !== componentId) {
+                    return component;
+                  }
+
+                  if (field === "amplitude") {
+                    return {
+                      ...component,
+                      amplitude: Math.max(0, Math.min(2, value)),
+                    };
+                  }
+
+                  if (field === "frequency") {
+                    return {
+                      ...component,
+                      frequency: Math.max(0.1, Math.min(5000, value)),
+                    };
+                  }
+
+                  return {
+                    ...component,
                     phase: Math.max(0, Math.min(360, value)),
-                  },
-                }));
-              }
+                  };
+                }),
+              }));
+            }}
+            onRemoveMessageComponent={(componentId) => {
+              setSettings((current) => ({
+                ...current,
+                messageComponents:
+                  current.messageComponents.length > 1
+                    ? current.messageComponents.filter(
+                        (component) => component.id !== componentId
+                      )
+                    : current.messageComponents,
+              }));
             }}
             onModulationIndexChange={(value) => {
               if (Number.isFinite(value)) {
@@ -432,7 +480,7 @@ export default function SignalWorkspace() {
               }
             }}
             onResetSignals={() => {
-              setSettings(DEFAULT_MODULATOR_SETTINGS);
+              setSettings(cloneDefaultModulatorSettings());
               setIsRunning(true);
             }}
             onResetPlot={() => {

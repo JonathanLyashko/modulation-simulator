@@ -4,8 +4,18 @@ export type OscillatorSettings = {
   phase: number;
 };
 
+export type MessageComponentType = "sine" | "cosine";
+
+export type MessageComponent = {
+  id: string;
+  type: MessageComponentType;
+  amplitude: number;
+  frequency: number;
+  phase: number;
+};
+
 export type ModulatorSettings = {
-  message: OscillatorSettings;
+  messageComponents: MessageComponent[];
   carrier: OscillatorSettings;
   modulationIndex: number;
 };
