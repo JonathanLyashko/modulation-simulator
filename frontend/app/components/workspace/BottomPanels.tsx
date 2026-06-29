@@ -1,19 +1,28 @@
-import type { PlotSettings, SignalSnapshot, SignalView } from "./types";
+import type {
+  PlotSettings,
+  SignalSnapshot,
+  SignalView,
+  SpectrumDisplayMode,
+} from "./types";
 import TimeDomainPanel from "./TimeDomainPanel";
 import FrequencySpectrumPanel from "./FrequencySpectrumPanel";
 
 type BottomPanelsProps = {
   signals: Record<SignalView, SignalSnapshot | null>;
+  spectra: Record<SignalView, SignalSnapshot | null>;
   selectedSignalView: SignalView;
   plotSettings: PlotSettings;
   playbackCursorSeconds: number | null;
+  spectrumDisplayMode: SpectrumDisplayMode;
 };
 
 export default function BottomPanels({
   signals,
+  spectra,
   selectedSignalView,
   plotSettings,
   playbackCursorSeconds,
+  spectrumDisplayMode,
 }: BottomPanelsProps) {
   return (
     <div className="flex h-[320px] gap-4 overflow-hidden border-t border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-4">
@@ -23,7 +32,12 @@ export default function BottomPanels({
         plotSettings={plotSettings}
         playbackCursorSeconds={playbackCursorSeconds}
       />
-      <FrequencySpectrumPanel />
+      <FrequencySpectrumPanel
+        spectra={spectra}
+        selectedSignalView={selectedSignalView}
+        plotSettings={plotSettings}
+        spectrumDisplayMode={spectrumDisplayMode}
+      />
     </div>
   );
 }

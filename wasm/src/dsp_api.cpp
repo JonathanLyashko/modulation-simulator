@@ -1,5 +1,6 @@
 #include "dsp_api.hpp"
 
+#include "fft.hpp"
 #include "modulation.hpp"
 #include "signal.hpp"
 
@@ -26,6 +27,10 @@ int dsp_get_signal_sample_rate(int signal_id) {
 
 float dsp_get_signal_sample(int signal_id, int sample_index) {
     return getSignalSample(signal_id, sample_index);
+}
+
+int dsp_fft_magnitude_spectrum(int signal_id) {
+    return fftMagnitudeSpectrum(signal_id);
 }
 
 void dsp_clear_signal(int signal_id) {

@@ -3,7 +3,11 @@
 import { startTransition, useEffect, useEffectEvent, useRef, useState } from "react";
 
 import { playSignalSamples, stopAudioPlayback } from "@/app/lib/audioPlayback";
-import { createDspClient, generateDsbLcBundle } from "@/app/lib/dspClient";
+import {
+  createDspClient,
+  generateDsbLcBundle,
+  readSignalSnapshot,
+} from "@/app/lib/dspClient";
 
 import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
@@ -28,6 +32,7 @@ import type {
   PlotSettings,
   SignalSnapshot,
   SignalView,
+  SpectrumDisplayMode,
 } from "./types";
 
 function cloneDefaultModulatorSettings(): ModulatorSettings {
@@ -64,6 +69,11 @@ export default function SignalWorkspace() {
     carrier: null,
     modulated: null,
   });
+  const [spectrumByView, setSpectrumByView] = useState<Record<SignalView, SignalSnapshot | null>>({
+    message: null,
+    carrier: null,
+    modulated: null,
+  });
   const [isRunning, setIsRunning] = useState(true);
   const [activeAmplitudeScheme, setActiveAmplitudeScheme] =
     useState<AnalogAmplitudeScheme>("DSB-LC");
@@ -82,6 +92,8 @@ export default function SignalWorkspace() {
   const [playbackCursorSeconds, setPlaybackCursorSeconds] = useState<number | null>(
     null
   );
+  const [spectrumDisplayMode, setSpectrumDisplayMode] =
+    useState<SpectrumDisplayMode>("magnitude");
 
   const requestedWindowSeconds = Math.max(
     DISPLAY_WINDOW_SECONDS,
@@ -137,11 +149,41 @@ export default function SignalWorkspace() {
           return;
         }
 
+        const messageSpectrumId = dsp.fftMagnitudeSpectrum(bundle.message.signalId);
+        const carrierSpectrumId = dsp.fftMagnitudeSpectrum(bundle.carrier.signalId);
+        const modulatedSpectrumId = dsp.fftMagnitudeSpectrum(bundle.modulated.signalId);
+
+        if (
+          messageSpectrumId < 0 ||
+          carrierSpectrumId < 0 ||
+          modulatedSpectrumId < 0
+        ) {
+          if (messageSpectrumId >= 0) {
+            dsp.destroySignal(messageSpectrumId);
+          }
+          if (carrierSpectrumId >= 0) {
+            dsp.destroySignal(carrierSpectrumId);
+          }
+          if (modulatedSpectrumId >= 0) {
+            dsp.destroySignal(modulatedSpectrumId);
+          }
+          throw new Error("Failed to generate FFT spectrum in the WASM module.");
+        }
+
+        const spectrumBundle = {
+          message: await readSignalSnapshot(messageSpectrumId),
+          carrier: await readSignalSnapshot(carrierSpectrumId),
+          modulated: await readSignalSnapshot(modulatedSpectrumId),
+        };
+
         const previousIds = [...activeSignalIdsRef.current];
         activeSignalIdsRef.current = [
           bundle.message.signalId,
           bundle.carrier.signalId,
           bundle.modulated.signalId,
+          spectrumBundle.message.signalId,
+          spectrumBundle.carrier.signalId,
+          spectrumBundle.modulated.signalId,
         ];
 
         for (const signalId of previousIds) {
@@ -154,6 +196,7 @@ export default function SignalWorkspace() {
             carrier: bundle.carrier,
             modulated: bundle.modulated,
           });
+          setSpectrumByView(spectrumBundle);
         });
       } catch (cause) {
         if (disposed) {
@@ -161,6 +204,11 @@ export default function SignalWorkspace() {
         }
 
         setSignalByView({
+          message: null,
+          carrier: null,
+          modulated: null,
+        });
+        setSpectrumByView({
           message: null,
           carrier: null,
           modulated: null,
@@ -351,9 +399,11 @@ export default function SignalWorkspace() {
             />
             <BottomPanels
               signals={signalByView}
+              spectra={spectrumByView}
               selectedSignalView={selectedSignalView}
               plotSettings={plotSettings}
               playbackCursorSeconds={playbackCursorSeconds}
+              spectrumDisplayMode={spectrumDisplayMode}
             />
           </main>
 
@@ -500,6 +550,8 @@ export default function SignalWorkspace() {
             onResetPlot={() => {
               setPlotSettings(DEFAULT_PLOT_SETTINGS);
             }}
+            spectrumDisplayMode={spectrumDisplayMode}
+            onSpectrumDisplayModeChange={setSpectrumDisplayMode}
             onPlayAudio={() => {
               void handlePlayAudio();
             }}

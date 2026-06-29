@@ -8,6 +8,7 @@ extern "C" {
     int dsp_get_signal_length(int signal_id);
     int dsp_get_signal_sample_rate(int signal_id);
     float dsp_get_signal_sample(int signal_id, int sample_index);
+    int dsp_fft_magnitude_spectrum(int signal_id);
     void dsp_clear_signal(int signal_id);
     void dsp_add_sine_component(
         int signal_id,

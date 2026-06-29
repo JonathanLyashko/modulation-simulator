@@ -10,6 +10,7 @@ import type {
   OscillatorSettings,
   PlotSettings,
   SignalView,
+  SpectrumDisplayMode,
 } from "./types";
 
 type InspectorPanelProps = {
@@ -33,6 +34,8 @@ type InspectorPanelProps = {
   onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
   onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
   onPlotSignalYScaleChange: (view: SignalView, value: number) => void;
+  spectrumDisplayMode: SpectrumDisplayMode;
+  onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
   onResetSignals: () => void;
   onResetPlot: () => void;
   onPlayAudio: () => void;
@@ -467,6 +470,8 @@ export default function InspectorPanel({
   onPlotSignalVisibilityChange,
   onPlotSignalXScaleChange,
   onPlotSignalYScaleChange,
+  spectrumDisplayMode,
+  onSpectrumDisplayModeChange,
   onResetSignals,
   onResetPlot,
   onPlayAudio,
@@ -550,6 +555,41 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Graph Settings">
+          <div className="space-y-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+            <div className="text-sm font-medium text-[color:var(--ui-text)]">
+              Spectrum Display
+            </div>
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                onClick={() => {
+                  onSpectrumDisplayModeChange("magnitude");
+                }}
+                className={[
+                  "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+                  spectrumDisplayMode === "magnitude"
+                    ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+                    : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+                ].join(" ")}
+              >
+                Raw Magnitude
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  onSpectrumDisplayModeChange("db");
+                }}
+                className={[
+                  "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+                  spectrumDisplayMode === "db"
+                    ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+                    : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+                ].join(" ")}
+              >
+                dB
+              </button>
+            </div>
+          </div>
           <PlotSignalSettingsSection
             title="Message Signal"
             view="message"
