@@ -1,34 +1,69 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f2f5f3;
-  --foreground: #13201c;
-  --panel: #fbfcfa;
-  --muted: #5f6b66;
-  --accent: #0f766e;
-  --grid: rgba(15, 118, 110, 0.12);
+  --background: #f7f9fb;
+  --foreground: #191c1e;
+  --ui-background: #f7f9fb;
+  --ui-text: #191c1e;
+  --ui-text-muted: #434653;
+  --ui-primary: #2156ca;
+  --ui-primary-container: #0047bb;
+  --ui-on-primary-container: #afc1ff;
+  --ui-secondary-container: #d5e3fc;
+  --ui-on-secondary-container: #57657a;
+  --ui-tertiary: #6c1f00;
+  --ui-surface: #f7f9fb;
+  --ui-surface-lowest: #ffffff;
+  --ui-surface-low: #f2f4f6;
+  --ui-surface-high: #e6e8ea;
+  --ui-surface-highest: #e0e3e5;
+  --ui-outline: #737685;
+  --ui-outline-variant: #c3c6d6;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-background: var(--ui-background);
+  --color-foreground: var(--ui-text);
   --font-sans: "Segoe UI";
   --font-mono: "Consolas";
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #08110f;
-    --foreground: #e8f2ee;
-    --panel: #0d1815;
-    --muted: #98a7a0;
-    --accent: #5eead4;
-    --grid: rgba(94, 234, 212, 0.18);
+    --background: #0a1115;
+    --foreground: #e8edf1;
+    --ui-background: #0a1115;
+    --ui-text: #e8edf1;
+    --ui-text-muted: #99a6b4;
+    --ui-primary: #7aa2ff;
+    --ui-primary-container: #285ad0;
+    --ui-on-primary-container: #dbe5ff;
+    --ui-secondary-container: #243447;
+    --ui-on-secondary-container: #d2e0f4;
+    --ui-tertiary: #ffb59c;
+    --ui-surface: #10181e;
+    --ui-surface-lowest: #121b21;
+    --ui-surface-low: #151f26;
+    --ui-surface-high: #1b2730;
+    --ui-surface-highest: #21303b;
+    --ui-outline: #7f8b98;
+    --ui-outline-variant: #32414d;
   }
 }
 
+* {
+  box-sizing: border-box;
+}
+
+html,
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--ui-background);
+  color: var(--ui-text);
   font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+  margin: 0;
+}
+
+button,
+input {
+  font: inherit;
 }

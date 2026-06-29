@@ -1,5 +1,5 @@
-import SignalDemo from "./signal-demo";
+import SignalWorkspace from "./components/workspace/SignalWorkspace";
 
 export default function Home() {
-  return <SignalDemo />;
+  return <SignalWorkspace />;
 }
