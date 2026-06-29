@@ -7,9 +7,7 @@ import { createDspClient, generateDsbLcBundle } from "@/app/lib/dspClient";
 import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
 import {
-  DEFAULT_CARRIER_SETTINGS,
-  DEFAULT_MESSAGE_AMPLITUDE,
-  DEFAULT_MESSAGE_FREQUENCY,
+  DEFAULT_MODULATOR_SETTINGS,
   DEFAULT_SAMPLE_COUNT,
   DEFAULT_SAMPLE_RATE,
 } from "./constants";
@@ -19,7 +17,7 @@ import TopBar from "./TopBar";
 import type {
   AnalogAmplitudeScheme,
   AnalogAngleScheme,
-  CarrierSettings,
+  ModulatorSettings,
   SignalSnapshot,
   SignalView,
 } from "./types";
@@ -39,11 +37,8 @@ export default function SignalWorkspace() {
     useState<AnalogAngleScheme>("FM");
   const [selectedSignalView, setSelectedSignalView] =
     useState<SignalView>("modulated");
-  const [draftSettings, setDraftSettings] = useState<CarrierSettings>(
-    DEFAULT_CARRIER_SETTINGS
-  );
-  const [appliedSettings, setAppliedSettings] = useState<CarrierSettings>(
-    DEFAULT_CARRIER_SETTINGS
+  const [settings, setSettings] = useState<ModulatorSettings>(
+    DEFAULT_MODULATOR_SETTINGS
   );
 
   useEffect(() => {
@@ -59,11 +54,13 @@ export default function SignalWorkspace() {
         const bundle = await generateDsbLcBundle({
           length: DEFAULT_SAMPLE_COUNT,
           sampleRate: DEFAULT_SAMPLE_RATE,
-          messageAmplitude: DEFAULT_MESSAGE_AMPLITUDE,
-          messageFrequency: DEFAULT_MESSAGE_FREQUENCY,
-          carrierAmplitude: appliedSettings.amplitude,
-          carrierFrequency: appliedSettings.frequency,
-          modulationIndex: appliedSettings.modulationIndex,
+          messageAmplitude: settings.message.amplitude,
+          messageFrequency: settings.message.frequency,
+          messagePhase: settings.message.phase,
+          carrierAmplitude: settings.carrier.amplitude,
+          carrierFrequency: settings.carrier.frequency,
+          carrierPhase: settings.carrier.phase,
+          modulationIndex: settings.modulationIndex,
         });
 
         if (disposed) {
@@ -110,7 +107,7 @@ export default function SignalWorkspace() {
     return () => {
       disposed = true;
     };
-  }, [appliedSettings, activeAmplitudeScheme]);
+  }, [settings, activeAmplitudeScheme]);
 
   useEffect(() => {
     return () => {
@@ -138,15 +135,13 @@ export default function SignalWorkspace() {
           isRunning={isRunning}
           onRun={() => {
             setIsRunning(true);
-            setAppliedSettings({ ...draftSettings });
           }}
           onPause={() => {
             setIsRunning(false);
           }}
           onReset={() => {
             setIsRunning(true);
-            setDraftSettings(DEFAULT_CARRIER_SETTINGS);
-            setAppliedSettings(DEFAULT_CARRIER_SETTINGS);
+            setSettings(DEFAULT_MODULATOR_SETTINGS);
           }}
         />
 
@@ -166,8 +161,8 @@ export default function SignalWorkspace() {
           <main className="flex min-w-0 flex-1 flex-col bg-[color:var(--ui-surface)]">
             <BlockCanvas
               activeModulation={activeAmplitudeScheme}
-              carrierFrequency={appliedSettings.frequency}
-              messageFrequency={DEFAULT_MESSAGE_FREQUENCY}
+              carrierFrequency={settings.carrier.frequency}
+              messageFrequency={settings.message.frequency}
               selectedSignalView={selectedSignalView}
               onSelectSignalView={setSelectedSignalView}
             />
@@ -178,38 +173,58 @@ export default function SignalWorkspace() {
           </main>
 
           <InspectorPanel
-            draftSettings={draftSettings}
+            selectedSignalView={selectedSignalView}
+            settings={settings}
             onAmplitudeChange={(value) => {
               if (Number.isFinite(value)) {
-                setDraftSettings((current) => ({
+                setSettings((current) => ({
                   ...current,
-                  amplitude: Math.max(0.1, Math.min(2, value)),
+                  [selectedSignalView === "message" ? "message" : "carrier"]: {
+                    ...(selectedSignalView === "message"
+                      ? current.message
+                      : current.carrier),
+                    amplitude: Math.max(0.1, Math.min(2, value)),
+                  },
                 }));
               }
             }}
             onFrequencyChange={(value) => {
               if (Number.isFinite(value)) {
-                setDraftSettings((current) => ({
+                const minFrequency = selectedSignalView === "message" ? 0.1 : 100;
+                setSettings((current) => ({
                   ...current,
-                  frequency: Math.max(100, Math.min(5000, value)),
+                  [selectedSignalView === "message" ? "message" : "carrier"]: {
+                    ...(selectedSignalView === "message"
+                      ? current.message
+                      : current.carrier),
+                    frequency: Math.max(minFrequency, Math.min(5000, value)),
+                  },
+                }));
+              }
+            }}
+            onPhaseChange={(value) => {
+              if (Number.isFinite(value)) {
+                setSettings((current) => ({
+                  ...current,
+                  [selectedSignalView === "message" ? "message" : "carrier"]: {
+                    ...(selectedSignalView === "message"
+                      ? current.message
+                      : current.carrier),
+                    phase: Math.max(0, Math.min(360, value)),
+                  },
                 }));
               }
             }}
             onModulationIndexChange={(value) => {
               if (Number.isFinite(value)) {
-                setDraftSettings((current) => ({
+                setSettings((current) => ({
                   ...current,
                   modulationIndex: Math.max(0, Math.min(1.5, value)),
                 }));
               }
             }}
-            onApply={() => {
-              setIsRunning(true);
-              setAppliedSettings({ ...draftSettings });
-            }}
             onReset={() => {
-              setDraftSettings(DEFAULT_CARRIER_SETTINGS);
-              setAppliedSettings(DEFAULT_CARRIER_SETTINGS);
+              setSettings(DEFAULT_MODULATOR_SETTINGS);
               setIsRunning(true);
             }}
           />

@@ -58,13 +58,14 @@ int dsp_am_modulate(
     int message_signal_id,
     float carrier_frequency,
     float carrier_amplitude,
-    float modulation_index
+    float modulation_index,
+    float initial_phase
 ) {
     return amModulate(message_signal_id, AmModulationParameters{
         CarrierParameters{
             carrier_amplitude,
             carrier_frequency,
-            0.0f,
+            initial_phase,
         },
         modulation_index,
     });

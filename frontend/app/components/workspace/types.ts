@@ -1,7 +1,12 @@
-export type CarrierSettings = {
+export type OscillatorSettings = {
   amplitude: number;
   frequency: number;
   phase: number;
+};
+
+export type ModulatorSettings = {
+  message: OscillatorSettings;
+  carrier: OscillatorSettings;
   modulationIndex: number;
 };
 

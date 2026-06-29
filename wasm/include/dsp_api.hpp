@@ -27,7 +27,8 @@ extern "C" {
         int message_signal_id,
         float carrier_frequency,
         float carrier_amplitude,
-        float modulation_index
+        float modulation_index,
+        float initial_phase
     );
 
     int dsp_fm_modulate(

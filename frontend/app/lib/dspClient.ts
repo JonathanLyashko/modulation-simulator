@@ -19,7 +19,8 @@ type DspExports = {
     messageSignalId: number,
     carrierFrequency: number,
     carrierAmplitude: number,
-    modulationIndex: number
+    modulationIndex: number,
+    initialPhase: number
   ): number;
   generateCarrier(
     signalId: number,
@@ -83,6 +84,7 @@ export async function createDspClient(): Promise<DspExports> {
       "number",
     ]),
     amModulate: wasmModule.cwrap("dsp_am_modulate", "number", [
+      "number",
       "number",
       "number",
       "number",
@@ -198,8 +200,10 @@ export async function generateDsbLcBundle(options?: {
   sampleRate?: number;
   messageAmplitude?: number;
   messageFrequency?: number;
+  messagePhase?: number;
   carrierAmplitude?: number;
   carrierFrequency?: number;
+  carrierPhase?: number;
   modulationIndex?: number;
 }): Promise<SignalBundle> {
   const {
@@ -207,8 +211,10 @@ export async function generateDsbLcBundle(options?: {
     sampleRate = 4096,
     messageAmplitude = 1,
     messageFrequency = 1,
+    messagePhase = 0,
     carrierAmplitude = 1,
     carrierFrequency = 1000,
+    carrierPhase = 0,
     modulationIndex = 0.8,
   } = options ?? {};
   const dsp = await createDspClient();
@@ -228,14 +234,15 @@ export async function generateDsbLcBundle(options?: {
     throw new Error("Failed to allocate AM signals in the WASM module.");
   }
 
-  dsp.generateCarrier(messageSignalId, messageAmplitude, messageFrequency, 0);
-  dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, 0);
+  dsp.generateCarrier(messageSignalId, messageAmplitude, messageFrequency, messagePhase);
+  dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
   const modulatedSignalId = dsp.amModulate(
     messageSignalId,
     carrierFrequency,
     carrierAmplitude,
-    modulationIndex
+    modulationIndex,
+    carrierPhase
   );
 
   if (modulatedSignalId < 0) {

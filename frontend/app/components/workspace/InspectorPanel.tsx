@@ -1,11 +1,12 @@
-import type { CarrierSettings } from "./types";
+import type { ModulatorSettings, SignalView } from "./types";
 
 type InspectorPanelProps = {
-  draftSettings: CarrierSettings;
+  selectedSignalView: SignalView;
+  settings: ModulatorSettings;
   onAmplitudeChange: (value: number) => void;
   onFrequencyChange: (value: number) => void;
+  onPhaseChange: (value: number) => void;
   onModulationIndexChange: (value: number) => void;
-  onApply: () => void;
   onReset: () => void;
 };
 
@@ -21,23 +22,38 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function InspectorPanel({
-  draftSettings,
+  selectedSignalView,
+  settings,
   onAmplitudeChange,
   onFrequencyChange,
+  onPhaseChange,
   onModulationIndexChange,
-  onApply,
   onReset,
 }: InspectorPanelProps) {
+  const selectedOscillator =
+    selectedSignalView === "message" ? settings.message : settings.carrier;
   const amplitudePercent = Math.max(
     0,
-    Math.min(100, (draftSettings.amplitude / 2) * 100)
+    Math.min(100, (selectedOscillator.amplitude / 2) * 100)
   );
+  const panelTitle =
+    selectedSignalView === "message"
+      ? "Message Signal Parameters"
+      : selectedSignalView === "carrier"
+        ? "Carrier Signal Parameters"
+        : "Modulator Parameters";
+  const frequencyLabel =
+    selectedSignalView === "message" ? "Message Frequency" : "Carrier Frequency";
+  const amplitudeLabel =
+    selectedSignalView === "message" ? "Message Amplitude (Peak)" : "Amplitude (Peak)";
+  const phaseLabel =
+    selectedSignalView === "message" ? "Message Phase Offset" : "Phase Offset";
 
   return (
     <aside className="flex w-[320px] shrink-0 flex-col border-l border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-low)]">
       <div className="flex items-center justify-between border-b border-[color:var(--ui-outline-variant)] p-4">
         <h2 className="text-sm font-semibold uppercase tracking-tight">
-          Modulator Parameters
+          {panelTitle}
         </h2>
         <button type="button" className="rounded p-1 text-[color:var(--ui-outline)]">
           i
@@ -45,19 +61,19 @@ export default function InspectorPanel({
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
-        <Section title="Carrier Frequency">
+        <Section title={frequencyLabel}>
           <div className="flex items-center justify-between">
             <span className="sr-only">Current</span>
             <span className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
-              {draftSettings.frequency.toFixed(0)} Hz
+              {selectedOscillator.frequency.toFixed(0)} Hz
             </span>
           </div>
           <input
             type="range"
-            min="100"
+            min={selectedSignalView === "message" ? "0.1" : "100"}
             max="5000"
-            step="50"
-            value={draftSettings.frequency}
+            step={selectedSignalView === "message" ? "0.1" : "50"}
+            value={selectedOscillator.frequency}
             onChange={(event) => {
               onFrequencyChange(Number(event.target.value));
             }}
@@ -66,17 +82,23 @@ export default function InspectorPanel({
           <div className="flex items-center gap-2">
             <button
               type="button"
-              onClick={() => onFrequencyChange(Math.max(100, draftSettings.frequency - 50))}
+              onClick={() =>
+                onFrequencyChange(
+                  selectedSignalView === "message"
+                    ? Math.max(0.1, selectedOscillator.frequency - 0.1)
+                    : Math.max(100, selectedOscillator.frequency - 50)
+                )
+              }
               className="h-8 w-8 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)]"
             >
               -
             </button>
             <input
               type="number"
-              min="100"
+              min={selectedSignalView === "message" ? "0.1" : "100"}
               max="5000"
-              step="50"
-              value={draftSettings.frequency}
+              step={selectedSignalView === "message" ? "0.1" : "50"}
+              value={selectedOscillator.frequency}
               onChange={(event) => {
                 onFrequencyChange(Number(event.target.value));
               }}
@@ -84,7 +106,13 @@ export default function InspectorPanel({
             />
             <button
               type="button"
-              onClick={() => onFrequencyChange(Math.min(5000, draftSettings.frequency + 50))}
+              onClick={() =>
+                onFrequencyChange(
+                  selectedSignalView === "message"
+                    ? Math.min(5000, selectedOscillator.frequency + 0.1)
+                    : Math.min(5000, selectedOscillator.frequency + 50)
+                )
+              }
               className="h-8 w-8 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)]"
             >
               +
@@ -92,7 +120,7 @@ export default function InspectorPanel({
           </div>
         </Section>
 
-        <Section title="Amplitude (Peak)">
+        <Section title={amplitudeLabel}>
           <div className="flex flex-col items-center gap-4">
             <div className="relative flex h-28 w-28 items-center justify-center">
               <svg className="h-full w-full -rotate-90" viewBox="0 0 100 100">
@@ -117,7 +145,7 @@ export default function InspectorPanel({
               </svg>
               <div className="absolute flex flex-col items-center">
                 <span className="font-mono text-lg font-semibold">
-                  {draftSettings.amplitude.toFixed(2)}
+                  {selectedOscillator.amplitude.toFixed(2)}
                 </span>
                 <span className="text-[11px] text-[color:var(--ui-outline)]">Volts</span>
               </div>
@@ -128,7 +156,7 @@ export default function InspectorPanel({
               min="0.1"
               max="2"
               step="0.05"
-              value={draftSettings.amplitude}
+              value={selectedOscillator.amplitude}
               onChange={(event) => {
                 onAmplitudeChange(Number(event.target.value));
               }}
@@ -139,7 +167,7 @@ export default function InspectorPanel({
               min="0.1"
               max="2"
               step="0.05"
-              value={draftSettings.amplitude}
+              value={selectedOscillator.amplitude}
               onChange={(event) => {
                 onAmplitudeChange(Number(event.target.value));
               }}
@@ -148,63 +176,68 @@ export default function InspectorPanel({
           </div>
         </Section>
 
-        <Section title="Modulation Index">
-          <div className="flex items-center justify-between">
-            <span className="text-sm text-[color:var(--ui-text-muted)]">Current</span>
-            <span className="font-mono text-sm text-[color:var(--ui-outline)]">
-              a = {draftSettings.modulationIndex.toFixed(2)}
-            </span>
-          </div>
-          <input
-            type="range"
-            min="0"
-            max="1.5"
-            step="0.05"
-            value={draftSettings.modulationIndex}
-            onChange={(event) => {
-              onModulationIndexChange(Number(event.target.value));
-            }}
-            className="w-full accent-[color:var(--ui-primary)]"
-          />
-        </Section>
+        {selectedSignalView === "modulated" ? (
+          <Section title="Modulation Index">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-[color:var(--ui-text-muted)]">Current</span>
+              <span className="font-mono text-sm text-[color:var(--ui-outline)]">
+                a = {settings.modulationIndex.toFixed(2)}
+              </span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1.5"
+              step="0.05"
+              value={settings.modulationIndex}
+              onChange={(event) => {
+                onModulationIndexChange(Number(event.target.value));
+              }}
+              className="w-full accent-[color:var(--ui-primary)]"
+            />
+          </Section>
+        ) : null}
 
-        <Section title="Phase Offset">
+        <Section title={phaseLabel}>
           <div className="flex items-center justify-between">
             <div className="text-sm text-[color:var(--ui-text-muted)]">
-              Shift carrier start phase
+              {selectedSignalView === "message"
+                ? "Shift message signal start phase"
+                : "Shift carrier start phase"}
             </div>
             <div className="rounded-full bg-[color:var(--ui-surface-highest)] px-3 py-1 text-xs text-[color:var(--ui-outline)]">
-              Off
+              {selectedOscillator.phase === 0 ? "Off" : "On"}
             </div>
           </div>
           <div className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-3 text-sm text-[color:var(--ui-outline)]">
             <div className="flex items-center gap-3">
               <span className="text-lg">R</span>
-              <div className="h-2 flex-1 rounded-full bg-[color:var(--ui-surface-highest)]">
-                <div className="h-2 w-[28%] rounded-full bg-[color:var(--ui-primary)]" />
-              </div>
-              <span className="font-mono">0 deg</span>
+              <input
+                type="range"
+                min="0"
+                max="360"
+                step="5"
+                value={selectedOscillator.phase}
+                onChange={(event) => {
+                  onPhaseChange(Number(event.target.value));
+                }}
+                className="w-full accent-[color:var(--ui-primary)]"
+              />
+              <span className="w-14 text-right font-mono">
+                {selectedOscillator.phase.toFixed(0)} deg
+              </span>
             </div>
           </div>
         </Section>
 
         <div className="space-y-3 border-t border-[color:var(--ui-outline-variant)] pt-6">
-          <div className="grid gap-3">
-            <button
-              type="button"
-              onClick={onApply}
-              className="rounded-[2px] bg-[color:var(--ui-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--ui-primary-container)]"
-            >
-              Apply Parameters
-            </button>
-            <button
-              type="button"
-              onClick={onReset}
-              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] px-4 py-2 text-sm font-medium text-[color:var(--ui-text-muted)] transition-colors hover:bg-[color:var(--ui-surface-high)]"
-            >
-              Revert to Default
-            </button>
-          </div>
+          <button
+            type="button"
+            onClick={onReset}
+            className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] px-4 py-2 text-sm font-medium text-[color:var(--ui-text-muted)] transition-colors hover:bg-[color:var(--ui-surface-high)]"
+          >
+            Revert to Default
+          </button>
         </div>
       </div>
 
