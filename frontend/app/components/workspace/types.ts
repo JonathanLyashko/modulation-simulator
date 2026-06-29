@@ -10,6 +10,11 @@ export type ModulatorSettings = {
   modulationIndex: number;
 };
 
+export type PlotSettings = {
+  xScaleSecondsPerDivision: number;
+  yScaleVoltsPerDivision: number;
+};
+
 export type SignalSnapshot = {
   signalId: number;
   sampleRate: number;
