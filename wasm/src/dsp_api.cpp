@@ -24,6 +24,10 @@ int dsp_get_signal_sample_rate(int signal_id) {
     return getSignalSampleRate(signal_id);
 }
 
+float dsp_get_signal_sample(int signal_id, int sample_index) {
+    return getSignalSample(signal_id, sample_index);
+}
+
 void dsp_generate_sine(
     int signal_id,
     float amplitude,

@@ -74,6 +74,20 @@ int getSignalSampleRate(int id) {
     return signal->sampleRate;
 }
 
+float getSignalSample(int id, int index) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr || index < 0) {
+        return 0.0f;
+    }
+
+    const std::size_t sampleIndex = static_cast<std::size_t>(index);
+    if (sampleIndex >= signal->samples.size()) {
+        return 0.0f;
+    }
+
+    return signal->samples[sampleIndex];
+}
+
 std::size_t getSignalCount() {
     return gSignals.size();
 }

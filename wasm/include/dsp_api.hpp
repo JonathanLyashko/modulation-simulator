@@ -7,6 +7,7 @@ extern "C" {
     float* dsp_get_signal_ptr(int signal_id);
     int dsp_get_signal_length(int signal_id);
     int dsp_get_signal_sample_rate(int signal_id);
+    float dsp_get_signal_sample(int signal_id, int sample_index);
 
     void dsp_generate_sine(
         int signal_id,

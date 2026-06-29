@@ -1,7 +1,6 @@
 'use client';
 
 type DspModule = {
-  HEAPF32: Float32Array;
   cwrap: <T extends (...args: number[]) => number | void>(
     name: string,
     returnType: "number" | null,
@@ -15,6 +14,7 @@ type DspExports = {
   getSignalPointer(signalId: number): number;
   getSignalLength(signalId: number): number;
   getSignalSampleRate(signalId: number): number;
+  getSignalSample(signalId: number, sampleIndex: number): number;
   generateSine(
     signalId: number,
     amplitude: number,
@@ -60,6 +60,10 @@ export async function createDspClient(): Promise<DspExports> {
     getSignalPointer: wasmModule.cwrap("dsp_get_signal_ptr", "number", ["number"]),
     getSignalLength: wasmModule.cwrap("dsp_get_signal_length", "number", ["number"]),
     getSignalSampleRate: wasmModule.cwrap("dsp_get_signal_sample_rate", "number", ["number"]),
+    getSignalSample: wasmModule.cwrap("dsp_get_signal_sample", "number", [
+      "number",
+      "number",
+    ]),
     generateSine: wasmModule.cwrap("dsp_generate_sine", null, [
       "number",
       "number",
@@ -83,7 +87,6 @@ export async function generateSineSnapshot(options?: {
     frequency = 1_000,
     phase = 0,
   } = options ?? {};
-  const wasmModule = await getModule();
   const dsp = await createDspClient();
   const signalId = dsp.createSignal(length, sampleRate);
 
@@ -93,17 +96,18 @@ export async function generateSineSnapshot(options?: {
 
   dsp.generateSine(signalId, amplitude, frequency, phase);
 
-  const pointer = dsp.getSignalPointer(signalId);
   const actualLength = dsp.getSignalLength(signalId);
   const actualSampleRate = dsp.getSignalSampleRate(signalId);
 
-  if (pointer === 0 || actualLength <= 0 || actualSampleRate <= 0) {
+  if (actualLength <= 0 || actualSampleRate <= 0) {
     dsp.destroySignal(signalId);
     throw new Error("WASM module returned an invalid signal.");
   }
 
-  const start = pointer / Float32Array.BYTES_PER_ELEMENT;
-  const samples = wasmModule.HEAPF32.slice(start, start + actualLength);
+  const samples = new Float32Array(actualLength);
+  for (let index = 0; index < actualLength; index += 1) {
+    samples[index] = dsp.getSignalSample(signalId, index);
+  }
 
   return {
     signalId,
