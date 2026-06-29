@@ -20,10 +20,13 @@ export type ModulatorSettings = {
   modulationIndex: number;
 };
 
-export type PlotSettings = {
+export type PlotSignalSettings = {
+  visible: boolean;
   xScaleSecondsPerDivision: number;
   yScaleVoltsPerDivision: number;
 };
+
+export type PlotSettings = Record<SignalView, PlotSignalSettings>;
 
 export type SignalSnapshot = {
   signalId: number;

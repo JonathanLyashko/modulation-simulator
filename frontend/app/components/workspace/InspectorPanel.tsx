@@ -9,6 +9,7 @@ import type {
   ModulatorSettings,
   OscillatorSettings,
   PlotSettings,
+  SignalView,
 } from "./types";
 
 type InspectorPanelProps = {
@@ -29,8 +30,9 @@ type InspectorPanelProps = {
   ) => void;
   onRemoveMessageComponent: (componentId: string) => void;
   onModulationIndexChange: (value: number) => void;
-  onPlotXScaleChange: (value: number) => void;
-  onPlotYScaleChange: (value: number) => void;
+  onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
+  onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
+  onPlotSignalYScaleChange: (view: SignalView, value: number) => void;
   onResetSignals: () => void;
   onResetPlot: () => void;
   onPlayAudio: () => void;
@@ -84,6 +86,89 @@ function RangeField({
         }}
         className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-2 text-center font-mono"
       />
+    </div>
+  );
+}
+
+function MessageExpressionSummary({
+  messageComponents,
+}: {
+  messageComponents: MessageComponent[];
+}) {
+  return (
+    <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white px-4 py-3">
+      <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-text-muted)]">
+        Message Expression
+      </div>
+      {messageComponents.length === 0 ? (
+        <div className="mt-3 font-serif text-lg text-[color:var(--ui-text)]">
+          m(t) = 0
+        </div>
+      ) : (
+        <>
+          <div className="mt-3 space-y-1 font-serif text-[color:var(--ui-text)]">
+            {messageComponents.map((component, index) => {
+              const sign = component.amplitude < 0 ? "-" : "+";
+              const magnitude = Math.abs(component.amplitude).toFixed(2);
+              const basis = component.type === "sine" ? "sin" : "cos";
+              const sizeClass =
+                index === 0
+                  ? "text-[1.02rem]"
+                  : index === 1
+                    ? "text-[0.95rem]"
+                    : index === 2
+                      ? "text-[0.88rem]"
+                      : "text-[0.81rem]";
+
+              return (
+                <div
+                  key={component.id}
+                  className={`flex items-start gap-2 leading-7 ${sizeClass}`}
+                >
+                  <span className="w-12 shrink-0 text-right">
+                    {index === 0 ? (
+                      <>
+                        <span className="italic">m</span>
+                        <span>(t) =</span>
+                      </>
+                    ) : (
+                      sign
+                    )}
+                  </span>
+                  <span className="min-w-0 break-words">
+                    <span>{magnitude}</span>
+                    <span className="ml-1 italic">{basis}</span>
+                    <span>(2π</span>
+                    <span className="italic">f</span>
+                    <sub>{index + 1}</sub>
+                    <span>t</span>
+                    {component.phase !== 0 ? (
+                      <>
+                        <span> + </span>
+                        <span>φ</span>
+                        <sub>{index + 1}</sub>
+                      </>
+                    ) : null}
+                    <span>)</span>
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="mt-3 grid gap-y-1 text-xs text-[color:var(--ui-text-muted)]">
+            {messageComponents.map((component, index) => (
+              <span key={component.id}>
+                <span className="font-mono">f{index + 1}</span>
+                <span>
+                  {" "}
+                  = {component.frequency.toFixed(component.frequency < 10 ? 1 : 0)} Hz,
+                  {" "}φ{index + 1} = {component.phase.toFixed(0)}°
+                </span>
+              </span>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
@@ -304,6 +389,67 @@ function MessageComponentEditor({
   );
 }
 
+function PlotSignalSettingsSection({
+  title,
+  view,
+  visible,
+  xScaleSecondsPerDivision,
+  yScaleVoltsPerDivision,
+  onVisibilityChange,
+  onXScaleChange,
+  onYScaleChange,
+}: {
+  title: string;
+  view: SignalView;
+  visible: boolean;
+  xScaleSecondsPerDivision: number;
+  yScaleVoltsPerDivision: number;
+  onVisibilityChange: (view: SignalView, visible: boolean) => void;
+  onXScaleChange: (view: SignalView, value: number) => void;
+  onYScaleChange: (view: SignalView, value: number) => void;
+}) {
+  return (
+    <div className="space-y-4 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-sm font-medium text-[color:var(--ui-text)]">{title}</span>
+        <label className="flex items-center gap-2 text-xs text-[color:var(--ui-text-muted)]">
+          <input
+            type="checkbox"
+            checked={visible}
+            onChange={(event) => {
+              onVisibilityChange(view, event.target.checked);
+            }}
+            className="accent-[color:var(--ui-primary)]"
+          />
+          Show
+        </label>
+      </div>
+      <RangeField
+        title="X Axis Scale"
+        valueLabel={`${(xScaleSecondsPerDivision * 1000).toFixed(2)} ms/div`}
+        min={0.0005}
+        max={0.05}
+        step={0.0005}
+        value={xScaleSecondsPerDivision}
+        onChange={(value) => {
+          onXScaleChange(view, value);
+        }}
+      />
+      <RangeField
+        title="Y Axis Scale"
+        valueLabel={`${yScaleVoltsPerDivision.toFixed(2)} V/div`}
+        min={0.05}
+        max={2}
+        step={0.05}
+        value={yScaleVoltsPerDivision}
+        onChange={(value) => {
+          onYScaleChange(view, value);
+        }}
+      />
+    </div>
+  );
+}
+
 export default function InspectorPanel({
   settings,
   plotSettings,
@@ -318,8 +464,9 @@ export default function InspectorPanel({
   onUpdateMessageComponent,
   onRemoveMessageComponent,
   onModulationIndexChange,
-  onPlotXScaleChange,
-  onPlotYScaleChange,
+  onPlotSignalVisibilityChange,
+  onPlotSignalXScaleChange,
+  onPlotSignalYScaleChange,
   onResetSignals,
   onResetPlot,
   onPlayAudio,
@@ -349,6 +496,7 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Message Settings">
+          <MessageExpressionSummary messageComponents={messageComponents} />
           <div className="flex gap-2">
             <button
               type="button"
@@ -402,23 +550,35 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Graph Settings">
-          <RangeField
-            title="X Axis Scale"
-            valueLabel={`${(plotSettings.xScaleSecondsPerDivision * 1000).toFixed(2)} ms/div`}
-            min={0.0005}
-            max={0.05}
-            step={0.0005}
-            value={plotSettings.xScaleSecondsPerDivision}
-            onChange={onPlotXScaleChange}
+          <PlotSignalSettingsSection
+            title="Message Signal"
+            view="message"
+            visible={plotSettings.message.visible}
+            xScaleSecondsPerDivision={plotSettings.message.xScaleSecondsPerDivision}
+            yScaleVoltsPerDivision={plotSettings.message.yScaleVoltsPerDivision}
+            onVisibilityChange={onPlotSignalVisibilityChange}
+            onXScaleChange={onPlotSignalXScaleChange}
+            onYScaleChange={onPlotSignalYScaleChange}
           />
-          <RangeField
-            title="Y Axis Scale"
-            valueLabel={`${plotSettings.yScaleVoltsPerDivision.toFixed(2)} V/div`}
-            min={0.05}
-            max={2}
-            step={0.05}
-            value={plotSettings.yScaleVoltsPerDivision}
-            onChange={onPlotYScaleChange}
+          <PlotSignalSettingsSection
+            title="Carrier Signal"
+            view="carrier"
+            visible={plotSettings.carrier.visible}
+            xScaleSecondsPerDivision={plotSettings.carrier.xScaleSecondsPerDivision}
+            yScaleVoltsPerDivision={plotSettings.carrier.yScaleVoltsPerDivision}
+            onVisibilityChange={onPlotSignalVisibilityChange}
+            onXScaleChange={onPlotSignalXScaleChange}
+            onYScaleChange={onPlotSignalYScaleChange}
+          />
+          <PlotSignalSettingsSection
+            title="Modulated Signal"
+            view="modulated"
+            visible={plotSettings.modulated.visible}
+            xScaleSecondsPerDivision={plotSettings.modulated.xScaleSecondsPerDivision}
+            yScaleVoltsPerDivision={plotSettings.modulated.yScaleVoltsPerDivision}
+            onVisibilityChange={onPlotSignalVisibilityChange}
+            onXScaleChange={onPlotSignalXScaleChange}
+            onYScaleChange={onPlotSignalYScaleChange}
           />
           <button
             type="button"

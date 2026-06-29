@@ -2,18 +2,18 @@
 
 import { useEffect, useMemo, useRef } from "react";
 
-import type { PlotSettings } from "./types";
+import type { PlotSettings, SignalSnapshot, SignalView } from "./types";
 
 type TimeDomainPanelProps = {
-  samples: Float32Array | null;
-  sampleRate: number | null;
-  signalLabel: string;
+  signals: Record<SignalView, SignalSnapshot | null>;
+  selectedSignalView: SignalView;
   plotSettings: PlotSettings;
   playbackCursorSeconds: number | null;
 };
 
 const MAX_RENDER_POINTS = 4096;
 const GRID_DIVISIONS = 10;
+const SIGNAL_ORDER: SignalView[] = ["message", "carrier", "modulated"];
 
 function drawGrid(
   context: CanvasRenderingContext2D,
@@ -45,20 +45,14 @@ function drawWaveform(
   context: CanvasRenderingContext2D,
   width: number,
   height: number,
-  samples: Float32Array | null,
-  yScaleVoltsPerDivision: number
+  samples: Float32Array,
+  yScaleVoltsPerDivision: number,
+  strokeStyle: string,
+  lineWidth: number
 ) {
-  if (!samples || samples.length === 0) {
-    context.fillStyle = "rgba(148, 163, 184, 0.85)";
-    context.font = "14px Consolas";
-    context.fillText("Waiting for signal data...", 20, 28);
-    return;
-  }
-
   const verticalHalfRangeVolts = yScaleVoltsPerDivision * (GRID_DIVISIONS / 2);
-
-  context.strokeStyle = "#60a5fa";
-  context.lineWidth = 2;
+  context.strokeStyle = strokeStyle;
+  context.lineWidth = lineWidth;
   context.beginPath();
 
   const stride = Math.max(1, Math.ceil(samples.length / MAX_RENDER_POINTS));
@@ -92,8 +86,8 @@ function drawPlaybackCursor(
   }
 
   const normalizedX =
-    ((cursorSeconds % visibleDurationSeconds) + visibleDurationSeconds) %
-    visibleDurationSeconds /
+    (((cursorSeconds % visibleDurationSeconds) + visibleDurationSeconds) %
+      visibleDurationSeconds) /
     visibleDurationSeconds;
   const x = normalizedX * width;
 
@@ -121,31 +115,67 @@ function formatVoltsPerDivision(voltsPerDivision: number) {
   return `V: ${voltsPerDivision.toFixed(2)} V/div`;
 }
 
+function getSignalLabel(view: SignalView) {
+  if (view === "message") {
+    return "Message";
+  }
+
+  if (view === "carrier") {
+    return "Carrier";
+  }
+
+  return "Modulated";
+}
+
 export default function TimeDomainPanel({
-  samples,
-  sampleRate,
-  signalLabel,
+  signals,
+  selectedSignalView,
   plotSettings,
   playbackCursorSeconds,
 }: TimeDomainPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  const displayedSamples = useMemo(() => {
-    if (!samples || !sampleRate) {
-      return samples;
-    }
+  const displayedSignals = useMemo(() => {
+    return SIGNAL_ORDER.map((view) => {
+      const signal = signals[view];
+      const settings = plotSettings[view];
 
-    const requestedSampleCount = Math.max(
-      1,
-      Math.floor(
-        sampleRate * plotSettings.xScaleSecondsPerDivision * GRID_DIVISIONS
-      )
+      if (!signal || !settings.visible) {
+        return {
+          view,
+          samples: null,
+          sampleRate: null,
+          xScaleSecondsPerDivision: settings.xScaleSecondsPerDivision,
+          yScaleVoltsPerDivision: settings.yScaleVoltsPerDivision,
+        };
+      }
+
+      const requestedSampleCount = Math.max(
+        1,
+        Math.floor(signal.sampleRate * settings.xScaleSecondsPerDivision * GRID_DIVISIONS)
+      );
+
+      return {
+        view,
+        samples: signal.samples.slice(0, Math.min(signal.samples.length, requestedSampleCount)),
+        sampleRate: signal.sampleRate,
+        xScaleSecondsPerDivision: settings.xScaleSecondsPerDivision,
+        yScaleVoltsPerDivision: settings.yScaleVoltsPerDivision,
+      };
+    });
+  }, [plotSettings, signals]);
+
+  const selectedVisibleDurationSeconds = useMemo(() => {
+    const selectedSignal = displayedSignals.find(
+      (signal) => signal.view === selectedSignalView
     );
 
-    return samples.slice(0, Math.min(samples.length, requestedSampleCount));
-  }, [plotSettings.xScaleSecondsPerDivision, sampleRate, samples]);
-  const visibleDurationSeconds =
-    sampleRate && displayedSamples ? displayedSamples.length / sampleRate : 0;
+    if (!selectedSignal?.samples || !selectedSignal.sampleRate) {
+      return 0;
+    }
+
+    return selectedSignal.samples.length / selectedSignal.sampleRate;
+  }, [displayedSignals, selectedSignalView]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -160,33 +190,65 @@ export default function TimeDomainPanel({
 
     const { width, height } = canvas;
     drawGrid(context, width, height);
-    drawWaveform(
-      context,
-      width,
-      height,
-      displayedSamples,
-      plotSettings.yScaleVoltsPerDivision
-    );
+
+    let hasVisibleSignal = false;
+    for (const signal of displayedSignals) {
+      if (!signal.samples || signal.samples.length === 0) {
+        continue;
+      }
+
+      hasVisibleSignal = true;
+      const isSelected = signal.view === selectedSignalView;
+      drawWaveform(
+        context,
+        width,
+        height,
+        signal.samples,
+        signal.yScaleVoltsPerDivision,
+        isSelected ? "#60a5fa" : "rgba(148, 163, 184, 0.32)",
+        isSelected ? 2.4 : 1.2
+      );
+    }
+
+    if (!hasVisibleSignal) {
+      context.fillStyle = "rgba(148, 163, 184, 0.85)";
+      context.font = "14px Consolas";
+      context.fillText("All signals are hidden or unavailable.", 20, 28);
+    }
+
     drawPlaybackCursor(
       context,
       width,
       height,
       playbackCursorSeconds,
-      visibleDurationSeconds
+      selectedVisibleDurationSeconds
     );
-  }, [
-    displayedSamples,
-    playbackCursorSeconds,
-    plotSettings.yScaleVoltsPerDivision,
-    visibleDurationSeconds,
-  ]);
+  }, [displayedSignals, playbackCursorSeconds, selectedSignalView, selectedVisibleDurationSeconds]);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
       <div className="mb-2 flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-outline)]">
-          <span className="h-3 w-3 rounded-full bg-[color:var(--ui-primary)]" />
-          {signalLabel}
+        <div className="flex items-center gap-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-outline)]">
+          <span className="text-[color:var(--ui-primary)]">Time Domain</span>
+          {SIGNAL_ORDER.map((view) => (
+            <span
+              key={view}
+              className="flex items-center gap-2 normal-case tracking-normal text-xs font-medium"
+            >
+              <span
+                className="h-2.5 w-2.5 rounded-full"
+                style={{
+                  backgroundColor:
+                    view === selectedSignalView
+                      ? "#60a5fa"
+                      : plotSettings[view].visible
+                        ? "rgba(148, 163, 184, 0.32)"
+                        : "rgba(71, 85, 105, 0.45)",
+                }}
+              />
+              {getSignalLabel(view)}
+            </span>
+          ))}
         </div>
         <div className="flex gap-3 text-xs text-[color:var(--ui-text-muted)]">
           <button type="button">+</button>
@@ -202,9 +264,9 @@ export default function TimeDomainPanel({
           className="h-full w-full"
           aria-label="Signal waveform plot"
         />
-        <div className="absolute bottom-2 right-2 flex gap-4 text-[10px] font-mono text-white/60">
-          <span>{formatTimePerDivision(plotSettings.xScaleSecondsPerDivision)}</span>
-          <span>{formatVoltsPerDivision(plotSettings.yScaleVoltsPerDivision)}</span>
+        <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1 text-[10px] font-mono text-white/60">
+          <span>{formatTimePerDivision(plotSettings[selectedSignalView].xScaleSecondsPerDivision)}</span>
+          <span>{formatVoltsPerDivision(plotSettings[selectedSignalView].yScaleVoltsPerDivision)}</span>
         </div>
       </div>
     </section>

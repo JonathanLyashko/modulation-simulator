@@ -30,6 +30,19 @@ export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
 };
 
 export const DEFAULT_PLOT_SETTINGS: PlotSettings = {
-  xScaleSecondsPerDivision: DEFAULT_X_SCALE_SECONDS_PER_DIVISION,
-  yScaleVoltsPerDivision: DEFAULT_Y_SCALE_VOLTS_PER_DIVISION,
+  message: {
+    visible: true,
+    xScaleSecondsPerDivision: DEFAULT_X_SCALE_SECONDS_PER_DIVISION,
+    yScaleVoltsPerDivision: DEFAULT_Y_SCALE_VOLTS_PER_DIVISION,
+  },
+  carrier: {
+    visible: true,
+    xScaleSecondsPerDivision: DEFAULT_X_SCALE_SECONDS_PER_DIVISION,
+    yScaleVoltsPerDivision: DEFAULT_Y_SCALE_VOLTS_PER_DIVISION,
+  },
+  modulated: {
+    visible: true,
+    xScaleSecondsPerDivision: DEFAULT_X_SCALE_SECONDS_PER_DIVISION,
+    yScaleVoltsPerDivision: DEFAULT_Y_SCALE_VOLTS_PER_DIVISION,
+  },
 };

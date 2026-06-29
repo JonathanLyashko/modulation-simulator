@@ -85,7 +85,9 @@ export default function SignalWorkspace() {
 
   const requestedWindowSeconds = Math.max(
     DISPLAY_WINDOW_SECONDS,
-    plotSettings.xScaleSecondsPerDivision * 10
+    ...Object.values(plotSettings).map(
+      (signalPlotSettings) => signalPlotSettings.xScaleSecondsPerDivision * 10
+    )
   );
   const highestMessageFrequency = settings.messageComponents.reduce(
     (currentMaximum, component) => Math.max(currentMaximum, component.frequency),
@@ -348,9 +350,8 @@ export default function SignalWorkspace() {
               onSelectSignalView={setSelectedSignalView}
             />
             <BottomPanels
-              samples={selectedSignal?.samples ?? null}
-              sampleRate={selectedSignal?.sampleRate ?? null}
-              signalLabel={selectedSignalLabel}
+              signals={signalByView}
+              selectedSignalView={selectedSignalView}
               plotSettings={plotSettings}
               playbackCursorSeconds={playbackCursorSeconds}
             />
@@ -457,27 +458,40 @@ export default function SignalWorkspace() {
                 }));
               }
             }}
-            onPlotXScaleChange={(value) => {
-              if (Number.isFinite(value)) {
-                setPlotSettings((current) => ({
-                  ...current,
-                  xScaleSecondsPerDivision: Math.max(
-                    0.0005,
-                    Math.min(0.05, value)
-                  ),
-                }));
-              }
+            onPlotSignalVisibilityChange={(view, visible) => {
+              setPlotSettings((current) => ({
+                ...current,
+                [view]: {
+                  ...current[view],
+                  visible,
+                },
+              }));
             }}
-            onPlotYScaleChange={(value) => {
-              if (Number.isFinite(value)) {
-                setPlotSettings((current) => ({
-                  ...current,
-                  yScaleVoltsPerDivision: Math.max(
-                    0.05,
-                    Math.min(2, value)
-                  ),
-                }));
+            onPlotSignalXScaleChange={(view, value) => {
+              if (!Number.isFinite(value)) {
+                return;
               }
+
+              setPlotSettings((current) => ({
+                ...current,
+                [view]: {
+                  ...current[view],
+                  xScaleSecondsPerDivision: Math.max(0.0005, Math.min(0.05, value)),
+                },
+              }));
+            }}
+            onPlotSignalYScaleChange={(view, value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              setPlotSettings((current) => ({
+                ...current,
+                [view]: {
+                  ...current[view],
+                  yScaleVoltsPerDivision: Math.max(0.05, Math.min(2, value)),
+                },
+              }));
             }}
             onResetSignals={() => {
               setSettings(cloneDefaultModulatorSettings());
