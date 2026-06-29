@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import type {
+  FrequencyPlotSettings,
   MessageComponent,
   MessageComponentType,
   ModulatorSettings,
@@ -16,6 +17,7 @@ import type {
 type InspectorPanelProps = {
   settings: ModulatorSettings;
   plotSettings: PlotSettings;
+  frequencyPlotSettings: FrequencyPlotSettings;
   selectedSignalLabel: string;
   isAudioPlaying: boolean;
   audioStatus: string;
@@ -34,6 +36,9 @@ type InspectorPanelProps = {
   onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
   onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
   onPlotSignalYScaleChange: (view: SignalView, value: number) => void;
+  onFrequencyPlotCenterChange: (value: number) => void;
+  onFrequencyPlotSpanChange: (value: number) => void;
+  onFrequencyPlotYScaleChange: (value: number) => void;
   spectrumDisplayMode: SpectrumDisplayMode;
   onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
   onResetSignals: () => void;
@@ -88,6 +93,104 @@ function RangeField({
           onChange(Number(event.target.value));
         }}
         className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-2 text-center font-mono"
+      />
+    </div>
+  );
+}
+
+function FrequencyPlotSettingsSection({
+  frequencyPlotSettings,
+  spectrumDisplayMode,
+  onCenterChange,
+  onSpanChange,
+  onYScaleChange,
+  onSpectrumDisplayModeChange,
+}: {
+  frequencyPlotSettings: FrequencyPlotSettings;
+  spectrumDisplayMode: SpectrumDisplayMode;
+  onCenterChange: (value: number) => void;
+  onSpanChange: (value: number) => void;
+  onYScaleChange: (value: number) => void;
+  onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
+}) {
+  const frequencyPerDivision = frequencyPlotSettings.spanHz / 10;
+
+  return (
+    <div className="space-y-4 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+      <div className="text-sm font-medium text-[color:var(--ui-text)]">
+        FFT Display
+      </div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          type="button"
+          onClick={() => {
+            onSpectrumDisplayModeChange("magnitude");
+          }}
+          className={[
+            "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+            spectrumDisplayMode === "magnitude"
+              ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+              : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+          ].join(" ")}
+        >
+          Raw Magnitude
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            onSpectrumDisplayModeChange("db");
+          }}
+          className={[
+            "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+            spectrumDisplayMode === "db"
+              ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+              : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+          ].join(" ")}
+        >
+          dB
+        </button>
+      </div>
+      <RangeField
+        title="Span"
+        valueLabel={`${frequencyPlotSettings.spanHz.toFixed(0)} Hz`}
+        min={100}
+        max={20000}
+        step={50}
+        value={frequencyPlotSettings.spanHz}
+        onChange={onSpanChange}
+      />
+      <RangeField
+        title="Center"
+        valueLabel={`${frequencyPlotSettings.centerHz.toFixed(0)} Hz`}
+        min={-20000}
+        max={20000}
+        step={50}
+        value={frequencyPlotSettings.centerHz}
+        onChange={onCenterChange}
+      />
+      <RangeField
+        title="Frequency / Div"
+        valueLabel={`${frequencyPerDivision.toFixed(0)} Hz/div`}
+        min={10}
+        max={2000}
+        step={5}
+        value={frequencyPerDivision}
+        onChange={(value) => {
+          onSpanChange(value * 10);
+        }}
+      />
+      <RangeField
+        title="Y Axis Scale"
+        valueLabel={
+          spectrumDisplayMode === "magnitude"
+            ? `${frequencyPlotSettings.yScale.toFixed(2)} mag/div`
+            : `${frequencyPlotSettings.yScale.toFixed(1)} dB/div`
+        }
+        min={spectrumDisplayMode === "magnitude" ? 0.02 : 1}
+        max={spectrumDisplayMode === "magnitude" ? 2 : 40}
+        step={spectrumDisplayMode === "magnitude" ? 0.02 : 1}
+        value={frequencyPlotSettings.yScale}
+        onChange={onYScaleChange}
       />
     </div>
   );
@@ -456,6 +559,7 @@ function PlotSignalSettingsSection({
 export default function InspectorPanel({
   settings,
   plotSettings,
+  frequencyPlotSettings,
   selectedSignalLabel,
   isAudioPlaying,
   audioStatus,
@@ -470,6 +574,9 @@ export default function InspectorPanel({
   onPlotSignalVisibilityChange,
   onPlotSignalXScaleChange,
   onPlotSignalYScaleChange,
+  onFrequencyPlotCenterChange,
+  onFrequencyPlotSpanChange,
+  onFrequencyPlotYScaleChange,
   spectrumDisplayMode,
   onSpectrumDisplayModeChange,
   onResetSignals,
@@ -554,42 +661,7 @@ export default function InspectorPanel({
           </button>
         </CollapsibleSection>
 
-        <CollapsibleSection title="Graph Settings">
-          <div className="space-y-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
-            <div className="text-sm font-medium text-[color:var(--ui-text)]">
-              Spectrum Display
-            </div>
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                onClick={() => {
-                  onSpectrumDisplayModeChange("magnitude");
-                }}
-                className={[
-                  "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
-                  spectrumDisplayMode === "magnitude"
-                    ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
-                    : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
-                ].join(" ")}
-              >
-                Raw Magnitude
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  onSpectrumDisplayModeChange("db");
-                }}
-                className={[
-                  "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
-                  spectrumDisplayMode === "db"
-                    ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
-                    : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
-                ].join(" ")}
-              >
-                dB
-              </button>
-            </div>
-          </div>
+        <CollapsibleSection title="Time Domain Settings">
           <PlotSignalSettingsSection
             title="Message Signal"
             view="message"
@@ -619,6 +691,24 @@ export default function InspectorPanel({
             onVisibilityChange={onPlotSignalVisibilityChange}
             onXScaleChange={onPlotSignalXScaleChange}
             onYScaleChange={onPlotSignalYScaleChange}
+          />
+          <button
+            type="button"
+            onClick={onResetPlot}
+            className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] px-4 py-2 text-sm font-medium text-[color:var(--ui-text-muted)] transition-colors hover:bg-[color:var(--ui-surface-high)]"
+          >
+            Reset Plot Settings
+          </button>
+        </CollapsibleSection>
+
+        <CollapsibleSection title="Frequency Plot Settings">
+          <FrequencyPlotSettingsSection
+            frequencyPlotSettings={frequencyPlotSettings}
+            spectrumDisplayMode={spectrumDisplayMode}
+            onCenterChange={onFrequencyPlotCenterChange}
+            onSpanChange={onFrequencyPlotSpanChange}
+            onYScaleChange={onFrequencyPlotYScaleChange}
+            onSpectrumDisplayModeChange={onSpectrumDisplayModeChange}
           />
           <button
             type="button"

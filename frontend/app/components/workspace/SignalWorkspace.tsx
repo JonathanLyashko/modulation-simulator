@@ -12,6 +12,7 @@ import {
 import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
 import {
+  DEFAULT_FREQUENCY_PLOT_SETTINGS,
   DEFAULT_MESSAGE_COMPONENTS,
   DEFAULT_MODULATOR_SETTINGS,
   DEFAULT_PLOT_SETTINGS,
@@ -26,6 +27,7 @@ import TopBar from "./TopBar";
 import type {
   AnalogAmplitudeScheme,
   AnalogAngleScheme,
+  FrequencyPlotSettings,
   MessageComponent,
   MessageComponentType,
   ModulatorSettings,
@@ -54,6 +56,26 @@ function createMessageComponent(type: MessageComponentType, index: number): Mess
     amplitude: 0.5,
     frequency: type === "sine" ? 2 : 1,
     phase: 0,
+  };
+}
+
+function createDefaultFrequencyPlotSettings(
+  carrierFrequency: number,
+  highestMessageFrequency: number
+): FrequencyPlotSettings {
+  const highestPositiveFrequency = Math.max(
+    10,
+    carrierFrequency + highestMessageFrequency
+  );
+  const recommendedSpan = Math.max(
+    DEFAULT_FREQUENCY_PLOT_SETTINGS.spanHz,
+    Math.ceil((highestPositiveFrequency * 2.4) / 100) * 100
+  );
+
+  return {
+    centerHz: 0,
+    spanHz: recommendedSpan,
+    yScale: DEFAULT_FREQUENCY_PLOT_SETTINGS.yScale,
   };
 }
 
@@ -87,6 +109,16 @@ export default function SignalWorkspace() {
   const [plotSettings, setPlotSettings] = useState<PlotSettings>(
     DEFAULT_PLOT_SETTINGS
   );
+  const [frequencyPlotSettings, setFrequencyPlotSettings] =
+    useState<FrequencyPlotSettings>(() =>
+      createDefaultFrequencyPlotSettings(
+        DEFAULT_MODULATOR_SETTINGS.carrier.frequency,
+        DEFAULT_MESSAGE_COMPONENTS.reduce(
+          (maximum, component) => Math.max(maximum, component.frequency),
+          0
+        )
+      )
+    );
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioStatus, setAudioStatus] = useState("Ready");
   const [playbackCursorSeconds, setPlaybackCursorSeconds] = useState<number | null>(
@@ -374,6 +406,15 @@ export default function SignalWorkspace() {
             setIsRunning(true);
             setSettings(cloneDefaultModulatorSettings());
             setPlotSettings(DEFAULT_PLOT_SETTINGS);
+            setFrequencyPlotSettings(
+              createDefaultFrequencyPlotSettings(
+                DEFAULT_MODULATOR_SETTINGS.carrier.frequency,
+                DEFAULT_MESSAGE_COMPONENTS.reduce(
+                  (maximum, component) => Math.max(maximum, component.frequency),
+                  0
+                )
+              )
+            );
           }}
         />
 
@@ -402,6 +443,7 @@ export default function SignalWorkspace() {
               spectra={spectrumByView}
               selectedSignalView={selectedSignalView}
               plotSettings={plotSettings}
+              frequencyPlotSettings={frequencyPlotSettings}
               playbackCursorSeconds={playbackCursorSeconds}
               spectrumDisplayMode={spectrumDisplayMode}
             />
@@ -410,6 +452,7 @@ export default function SignalWorkspace() {
           <InspectorPanel
             settings={settings}
             plotSettings={plotSettings}
+            frequencyPlotSettings={frequencyPlotSettings}
             selectedSignalLabel={selectedSignalLabel}
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
@@ -543,12 +586,58 @@ export default function SignalWorkspace() {
                 },
               }));
             }}
+            onFrequencyPlotCenterChange={(value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              const halfSpan = frequencyPlotSettings.spanHz / 2;
+              const maxCenter = Math.max(sampleRate / 2 - halfSpan, 0);
+              setFrequencyPlotSettings((current) => ({
+                ...current,
+                centerHz: Math.max(-maxCenter, Math.min(maxCenter, value)),
+              }));
+            }}
+            onFrequencyPlotSpanChange={(value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              const boundedSpan = Math.max(100, Math.min(sampleRate, value));
+              setFrequencyPlotSettings((current) => {
+                const maxCenter = Math.max(sampleRate / 2 - boundedSpan / 2, 0);
+                return {
+                  ...current,
+                  spanHz: boundedSpan,
+                  centerHz: Math.max(-maxCenter, Math.min(maxCenter, current.centerHz)),
+                };
+              });
+            }}
+            onFrequencyPlotYScaleChange={(value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              setFrequencyPlotSettings((current) => ({
+                ...current,
+                yScale:
+                  spectrumDisplayMode === "magnitude"
+                    ? Math.max(0.02, Math.min(2, value))
+                    : Math.max(1, Math.min(40, value)),
+              }));
+            }}
             onResetSignals={() => {
               setSettings(cloneDefaultModulatorSettings());
               setIsRunning(true);
             }}
             onResetPlot={() => {
               setPlotSettings(DEFAULT_PLOT_SETTINGS);
+              setFrequencyPlotSettings(
+                createDefaultFrequencyPlotSettings(
+                  settings.carrier.frequency,
+                  highestMessageFrequency
+                )
+              );
             }}
             spectrumDisplayMode={spectrumDisplayMode}
             onSpectrumDisplayModeChange={setSpectrumDisplayMode}

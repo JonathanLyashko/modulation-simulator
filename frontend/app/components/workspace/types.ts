@@ -28,6 +28,12 @@ export type PlotSignalSettings = {
 
 export type PlotSettings = Record<SignalView, PlotSignalSettings>;
 
+export type FrequencyPlotSettings = {
+  centerHz: number;
+  spanHz: number;
+  yScale: number;
+};
+
 export type SignalSnapshot = {
   signalId: number;
   sampleRate: number;

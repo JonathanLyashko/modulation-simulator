@@ -1,4 +1,5 @@
 import type {
+  FrequencyPlotSettings,
   PlotSettings,
   SignalSnapshot,
   SignalView,
@@ -12,6 +13,7 @@ type BottomPanelsProps = {
   spectra: Record<SignalView, SignalSnapshot | null>;
   selectedSignalView: SignalView;
   plotSettings: PlotSettings;
+  frequencyPlotSettings: FrequencyPlotSettings;
   playbackCursorSeconds: number | null;
   spectrumDisplayMode: SpectrumDisplayMode;
 };
@@ -21,6 +23,7 @@ export default function BottomPanels({
   spectra,
   selectedSignalView,
   plotSettings,
+  frequencyPlotSettings,
   playbackCursorSeconds,
   spectrumDisplayMode,
 }: BottomPanelsProps) {
@@ -36,6 +39,7 @@ export default function BottomPanels({
         spectra={spectra}
         selectedSignalView={selectedSignalView}
         plotSettings={plotSettings}
+        frequencyPlotSettings={frequencyPlotSettings}
         spectrumDisplayMode={spectrumDisplayMode}
       />
     </div>

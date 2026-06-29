@@ -1,4 +1,9 @@
-import type { MessageComponent, ModulatorSettings, PlotSettings } from "./types";
+import type {
+  FrequencyPlotSettings,
+  MessageComponent,
+  ModulatorSettings,
+  PlotSettings,
+} from "./types";
 
 export const DEFAULT_MESSAGE_AMPLITUDE = 1;
 export const DEFAULT_MESSAGE_FREQUENCY = 1;
@@ -45,4 +50,10 @@ export const DEFAULT_PLOT_SETTINGS: PlotSettings = {
     xScaleSecondsPerDivision: DEFAULT_X_SCALE_SECONDS_PER_DIVISION,
     yScaleVoltsPerDivision: DEFAULT_Y_SCALE_VOLTS_PER_DIVISION,
   },
+};
+
+export const DEFAULT_FREQUENCY_PLOT_SETTINGS: FrequencyPlotSettings = {
+  centerHz: 0,
+  spanHz: 2_500,
+  yScale: 0.2,
 };

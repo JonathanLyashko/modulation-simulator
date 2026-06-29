@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from "react";
 
 import type {
+  FrequencyPlotSettings,
   PlotSettings,
   SignalSnapshot,
   SignalView,
@@ -13,6 +14,7 @@ type FrequencySpectrumPanelProps = {
   spectra: Record<SignalView, SignalSnapshot | null>;
   selectedSignalView: SignalView;
   plotSettings: PlotSettings;
+  frequencyPlotSettings: FrequencyPlotSettings;
   spectrumDisplayMode: SpectrumDisplayMode;
 };
 
@@ -51,28 +53,44 @@ function drawSpectrum(
   width: number,
   height: number,
   samples: Float32Array,
+  sampleRate: number,
+  centerHz: number,
+  spanHz: number,
   yScale: number,
   mode: SpectrumDisplayMode,
   strokeStyle: string,
   lineWidth: number
 ) {
+  const frequencyPerSample = sampleRate / samples.length;
+  const minFrequency = centerHz - spanHz / 2;
+  const maxFrequency = centerHz + spanHz / 2;
+  const minIndex = Math.max(
+    0,
+    Math.floor((minFrequency + sampleRate / 2) / frequencyPerSample)
+  );
+  const maxIndex = Math.min(
+    samples.length - 1,
+    Math.ceil((maxFrequency + sampleRate / 2) / frequencyPerSample)
+  );
+
   context.strokeStyle = strokeStyle;
   context.lineWidth = lineWidth;
   context.beginPath();
 
-  const stride = Math.max(1, Math.ceil(samples.length / MAX_RENDER_POINTS));
-  const renderedPointCount = Math.ceil(samples.length / stride);
+  const visibleSampleCount = Math.max(1, maxIndex - minIndex + 1);
+  const stride = Math.max(1, Math.ceil(visibleSampleCount / MAX_RENDER_POINTS));
+  const renderedPointCount = Math.ceil(visibleSampleCount / stride);
   const verticalRange = Math.max(yScale * GRID_DIVISIONS, 1e-6);
 
   let peakDb = -120;
   if (mode === "db") {
-    for (let index = 0; index < samples.length; index += stride) {
+    for (let index = minIndex; index <= maxIndex; index += stride) {
       peakDb = Math.max(peakDb, 20 * Math.log10(Math.max(samples[index], 1e-6)));
     }
   }
 
   for (let pointIndex = 0; pointIndex < renderedPointCount; pointIndex += 1) {
-    const sampleIndex = Math.min(pointIndex * stride, samples.length - 1);
+    const sampleIndex = Math.min(minIndex + pointIndex * stride, maxIndex);
     const x = (pointIndex / Math.max(renderedPointCount - 1, 1)) * width;
 
     let y = height;
@@ -95,19 +113,35 @@ function drawSpectrum(
   context.stroke();
 }
 
-function formatSpan(sampleRate: number | null) {
-  if (!sampleRate || sampleRate <= 0) {
-    return "SPAN: --";
+function formatSpan(spanHz: number) {
+  if (spanHz >= 1000) {
+    return `SPAN: ${(spanHz / 1000).toFixed(2)} kHz`;
   }
 
-  return `SPAN: ${(-sampleRate / 2000).toFixed(1)} to ${(sampleRate / 2000).toFixed(1)} kHz`;
+  return `SPAN: ${spanHz.toFixed(0)} Hz`;
 }
 
-function formatScaleLabel(view: SignalView, plotSettings: PlotSettings, mode: SpectrumDisplayMode) {
-  const scale = plotSettings[view].yScaleVoltsPerDivision;
+function formatCenter(centerHz: number) {
+  if (Math.abs(centerHz) >= 1000) {
+    return `CENTER: ${(centerHz / 1000).toFixed(2)} kHz`;
+  }
+
+  return `CENTER: ${centerHz.toFixed(0)} Hz`;
+}
+
+function formatFrequencyPerDivision(spanHz: number) {
+  const frequencyPerDivision = spanHz / GRID_DIVISIONS;
+  if (frequencyPerDivision >= 1000) {
+    return `F: ${(frequencyPerDivision / 1000).toFixed(2)} kHz/div`;
+  }
+
+  return `F: ${frequencyPerDivision.toFixed(0)} Hz/div`;
+}
+
+function formatScaleLabel(yScale: number, mode: SpectrumDisplayMode) {
   return mode === "magnitude"
-    ? `${scale.toFixed(2)} mag/div`
-    : `${scale.toFixed(1)} dB/div`;
+    ? `${yScale.toFixed(2)} mag/div`
+    : `${yScale.toFixed(1)} dB/div`;
 }
 
 function getSignalLabel(view: SignalView) {
@@ -126,6 +160,7 @@ export default function FrequencySpectrumPanel({
   spectra,
   selectedSignalView,
   plotSettings,
+  frequencyPlotSettings,
   spectrumDisplayMode,
 }: FrequencySpectrumPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
@@ -164,7 +199,10 @@ export default function FrequencySpectrumPanel({
         width,
         height,
         item.spectrum.samples,
-        plotSettings[item.view].yScaleVoltsPerDivision,
+        item.spectrum.sampleRate,
+        frequencyPlotSettings.centerHz,
+        frequencyPlotSettings.spanHz,
+        frequencyPlotSettings.yScale,
         spectrumDisplayMode,
         isSelected ? "#60a5fa" : "rgba(148, 163, 184, 0.32)",
         isSelected ? 2.4 : 1.2
@@ -176,9 +214,7 @@ export default function FrequencySpectrumPanel({
       context.font = "14px Consolas";
       context.fillText("All spectra are hidden or unavailable.", 20, 28);
     }
-  }, [plotSettings, selectedSignalView, spectrumDisplayMode, visibleSpectra]);
-
-  const selectedSpectrum = spectra[selectedSignalView];
+  }, [frequencyPlotSettings, plotSettings, selectedSignalView, spectrumDisplayMode, visibleSpectra]);
 
   return (
     <section className="flex min-w-0 flex-1 flex-col">
@@ -220,8 +256,10 @@ export default function FrequencySpectrumPanel({
           aria-label="Frequency spectrum plot"
         />
         <div className="absolute bottom-2 right-2 flex flex-col items-end gap-1 text-[10px] font-mono text-white/60">
-          <span>{formatSpan(selectedSpectrum?.sampleRate ?? null)}</span>
-          <span>{formatScaleLabel(selectedSignalView, plotSettings, spectrumDisplayMode)}</span>
+          <span>{formatSpan(frequencyPlotSettings.spanHz)}</span>
+          <span>{formatCenter(frequencyPlotSettings.centerHz)}</span>
+          <span>{formatFrequencyPerDivision(frequencyPlotSettings.spanHz)}</span>
+          <span>{formatScaleLabel(frequencyPlotSettings.yScale, spectrumDisplayMode)}</span>
         </div>
       </div>
     </section>
