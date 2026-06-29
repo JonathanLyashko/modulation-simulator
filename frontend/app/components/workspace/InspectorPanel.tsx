@@ -2,14 +2,11 @@ import type { CarrierSettings } from "./types";
 
 type InspectorPanelProps = {
   draftSettings: CarrierSettings;
-  appliedSettings: CarrierSettings;
   onAmplitudeChange: (value: number) => void;
   onFrequencyChange: (value: number) => void;
+  onModulationIndexChange: (value: number) => void;
   onApply: () => void;
   onReset: () => void;
-  sampleCount: number;
-  sampleRate: number;
-  samplePreview: string;
 };
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
@@ -25,14 +22,11 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function InspectorPanel({
   draftSettings,
-  appliedSettings,
   onAmplitudeChange,
   onFrequencyChange,
+  onModulationIndexChange,
   onApply,
   onReset,
-  sampleCount,
-  sampleRate,
-  samplePreview,
 }: InspectorPanelProps) {
   const amplitudePercent = Math.max(
     0,
@@ -45,19 +39,16 @@ export default function InspectorPanel({
         <h2 className="text-sm font-semibold uppercase tracking-tight">
           Modulator Parameters
         </h2>
-        <button
-          type="button"
-          className="rounded p-1 text-[color:var(--ui-outline)] hover:text-[color:var(--ui-text)]"
-        >
-          Info
+        <button type="button" className="rounded p-1 text-[color:var(--ui-outline)]">
+          i
         </button>
       </div>
 
       <div className="flex-1 space-y-6 overflow-y-auto p-4">
         <Section title="Carrier Frequency">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[color:var(--ui-text-muted)]">Current</span>
-            <span className="rounded border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
+            <span className="sr-only">Current</span>
+            <span className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
               {draftSettings.frequency.toFixed(0)} Hz
             </span>
           </div>
@@ -76,7 +67,7 @@ export default function InspectorPanel({
             <button
               type="button"
               onClick={() => onFrequencyChange(Math.max(100, draftSettings.frequency - 50))}
-              className="h-8 w-8 rounded border border-[color:var(--ui-outline-variant)] hover:bg-[color:var(--ui-surface-high)]"
+              className="h-8 w-8 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)]"
             >
               -
             </button>
@@ -89,12 +80,12 @@ export default function InspectorPanel({
               onChange={(event) => {
                 onFrequencyChange(Number(event.target.value));
               }}
-              className="flex-1 rounded border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-1 text-center font-mono"
+              className="flex-1 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-1 text-center font-mono"
             />
             <button
               type="button"
               onClick={() => onFrequencyChange(Math.min(5000, draftSettings.frequency + 50))}
-              className="h-8 w-8 rounded border border-[color:var(--ui-outline-variant)] hover:bg-[color:var(--ui-surface-high)]"
+              className="h-8 w-8 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)]"
             >
               +
             </button>
@@ -152,21 +143,29 @@ export default function InspectorPanel({
               onChange={(event) => {
                 onAmplitudeChange(Number(event.target.value));
               }}
-              className="w-full rounded border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-2 text-center font-mono"
+              className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-2 text-center font-mono"
             />
           </div>
         </Section>
 
         <Section title="Modulation Index">
           <div className="flex items-center justify-between">
-            <span className="text-sm text-[color:var(--ui-text-muted)]">Reserved</span>
-            <span className="font-mono text-sm text-[color:var(--ui-outline)]">beta = 0.8</span>
+            <span className="text-sm text-[color:var(--ui-text-muted)]">Current</span>
+            <span className="font-mono text-sm text-[color:var(--ui-outline)]">
+              a = {draftSettings.modulationIndex.toFixed(2)}
+            </span>
           </div>
-          <div className="relative h-6">
-            <div className="absolute top-1/2 h-1 w-full -translate-y-1/2 rounded-full bg-[color:var(--ui-surface-highest)]" />
-            <div className="absolute top-1/2 h-1 w-[80%] -translate-y-1/2 rounded-full bg-[color:var(--ui-primary)]" />
-            <div className="absolute left-[80%] top-1/2 h-4 w-4 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-[color:var(--ui-surface)] bg-[color:var(--ui-primary)]" />
-          </div>
+          <input
+            type="range"
+            min="0"
+            max="1.5"
+            step="0.05"
+            value={draftSettings.modulationIndex}
+            onChange={(event) => {
+              onModulationIndexChange(Number(event.target.value));
+            }}
+            className="w-full accent-[color:var(--ui-primary)]"
+          />
         </Section>
 
         <Section title="Phase Offset">
@@ -178,58 +177,33 @@ export default function InspectorPanel({
               Off
             </div>
           </div>
-          <div className="rounded-lg border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-3 text-sm text-[color:var(--ui-outline)]">
-            Phase control placeholder. DSP support can be enabled later.
+          <div className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-3 text-sm text-[color:var(--ui-outline)]">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">R</span>
+              <div className="h-2 flex-1 rounded-full bg-[color:var(--ui-surface-highest)]">
+                <div className="h-2 w-[28%] rounded-full bg-[color:var(--ui-primary)]" />
+              </div>
+              <span className="font-mono">0 deg</span>
+            </div>
           </div>
         </Section>
 
         <div className="space-y-3 border-t border-[color:var(--ui-outline-variant)] pt-6">
-          <div className="rounded-lg border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-4">
-            <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-text-muted)]">
-              Applied Carrier
-            </div>
-            <div className="mt-2 font-mono text-sm text-[color:var(--ui-primary)]">
-              {`c(t)=${appliedSettings.amplitude.toFixed(2)}*cos(2pi*${appliedSettings.frequency.toFixed(0)}*t)`}
-            </div>
-          </div>
-
           <div className="grid gap-3">
             <button
               type="button"
               onClick={onApply}
-              className="rounded-md bg-[color:var(--ui-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--ui-primary-container)]"
+              className="rounded-[2px] bg-[color:var(--ui-primary)] px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-[color:var(--ui-primary-container)]"
             >
               Apply Parameters
             </button>
             <button
               type="button"
               onClick={onReset}
-              className="rounded-md border border-[color:var(--ui-outline-variant)] px-4 py-2 text-sm font-medium text-[color:var(--ui-text-muted)] transition-colors hover:bg-[color:var(--ui-surface-high)]"
+              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] px-4 py-2 text-sm font-medium text-[color:var(--ui-text-muted)] transition-colors hover:bg-[color:var(--ui-surface-high)]"
             >
               Revert to Default
             </button>
-          </div>
-        </div>
-
-        <div className="space-y-3 rounded-lg border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-4">
-          <div className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-text-muted)]">
-            DSP Status
-          </div>
-          <div className="space-y-2 text-sm">
-            <div className="flex items-center justify-between">
-              <span className="text-[color:var(--ui-text-muted)]">Samples</span>
-              <span className="font-semibold">{sampleCount}</span>
-            </div>
-            <div className="flex items-center justify-between">
-              <span className="text-[color:var(--ui-text-muted)]">Sample Rate</span>
-              <span className="font-semibold">{sampleRate.toLocaleString()} Hz</span>
-            </div>
-            <div>
-              <div className="mb-1 text-[color:var(--ui-text-muted)]">First 8 Samples</div>
-              <div className="font-mono text-xs leading-6 text-[color:var(--ui-primary)]">
-                {samplePreview}
-              </div>
-            </div>
           </div>
         </div>
       </div>

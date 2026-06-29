@@ -4,6 +4,7 @@ import { useEffect, useRef } from "react";
 
 type TimeDomainPanelProps = {
   samples: Float32Array | null;
+  signalLabel: string;
 };
 
 function drawGrid(
@@ -63,7 +64,10 @@ function drawWaveform(
   context.stroke();
 }
 
-export default function TimeDomainPanel({ samples }: TimeDomainPanelProps) {
+export default function TimeDomainPanel({
+  samples,
+  signalLabel,
+}: TimeDomainPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
   useEffect(() => {
@@ -87,15 +91,11 @@ export default function TimeDomainPanel({ samples }: TimeDomainPanelProps) {
       <div className="mb-2 flex items-center justify-between">
         <div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-outline)]">
           <span className="h-3 w-3 rounded-full bg-[color:var(--ui-primary)]" />
-          Time Domain
+          {signalLabel}
         </div>
-        <div className="flex gap-2 text-xs text-[color:var(--ui-text-muted)]">
-          <button type="button" className="rounded p-1 hover:bg-[color:var(--ui-surface-high)]">
-            Expand
-          </button>
-          <button type="button" className="rounded p-1 hover:bg-[color:var(--ui-surface-high)]">
-            Grid
-          </button>
+        <div className="flex gap-3 text-xs text-[color:var(--ui-text-muted)]">
+          <button type="button">⛶</button>
+          <button type="button">▦</button>
         </div>
       </div>
 

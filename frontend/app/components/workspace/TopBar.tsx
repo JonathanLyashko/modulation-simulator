@@ -19,10 +19,10 @@ function ToolbarButton({
       type="button"
       onClick={onClick}
       className={[
-        "rounded-md border px-4 py-2 text-sm font-semibold transition-colors",
+        "rounded-[3px] border px-4 py-2 text-sm font-semibold transition-colors",
         active
           ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
-          : "border-[color:var(--ui-outline)] bg-[color:var(--ui-surface-low)] text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-high)]",
+          : "border-transparent bg-[color:var(--ui-surface-high)] text-[color:var(--ui-text)] hover:bg-[#e7ebf1]",
       ].join(" ")}
     >
       {label}
@@ -39,27 +39,27 @@ export default function TopBar({
   return (
     <header className="flex h-16 items-center justify-between border-b border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-6">
       <div className="flex items-center gap-6">
-        <div>
-          <p className="text-lg font-semibold tracking-tight text-[color:var(--ui-primary)]">
+        <div className="pr-5 border-r border-[color:var(--ui-outline-variant)]">
+          <p className="text-[18px] font-semibold tracking-tight text-[color:var(--ui-primary)]">
             Precision Signal Lab
           </p>
         </div>
-        <nav className="flex items-center gap-1">
+        <nav className="flex items-center gap-4">
           <button
             type="button"
-            className="border-b-2 border-[color:var(--ui-primary)] px-3 py-5 text-sm font-semibold text-[color:var(--ui-primary)]"
+            className="border-b-[3px] border-[color:var(--ui-primary)] px-2 py-[19px] text-sm font-semibold text-[color:var(--ui-primary)]"
           >
             Workspace
           </button>
           <button
             type="button"
-            className="px-3 py-5 text-sm text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-high)]"
+            className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
           >
             Analysis
           </button>
           <button
             type="button"
-            className="px-3 py-5 text-sm text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-high)]"
+            className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
           >
             Library
           </button>
@@ -69,9 +69,9 @@ export default function TopBar({
       <div className="flex items-center gap-2">
         <ToolbarButton label="Run" active={isRunning} onClick={onRun} />
         <ToolbarButton label="Pause" onClick={onPause} />
-        <ToolbarButton label="Reset" onClick={onReset} />
-        <ToolbarButton label="Download" />
-        <ToolbarButton label="Save" />
+        <button type="button" onClick={onReset} className="px-3 py-2 text-[color:var(--ui-text)]">⟳</button>
+        <button type="button" className="px-3 py-2 text-[color:var(--ui-text)]">↓</button>
+        <button type="button" className="px-3 py-2 text-[color:var(--ui-text)]">💾</button>
       </div>
     </header>
   );

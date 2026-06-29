@@ -15,6 +15,12 @@ type DspExports = {
   getSignalLength(signalId: number): number;
   getSignalSampleRate(signalId: number): number;
   getSignalSample(signalId: number, sampleIndex: number): number;
+  amModulate(
+    messageSignalId: number,
+    carrierFrequency: number,
+    carrierAmplitude: number,
+    modulationIndex: number
+  ): number;
   generateCarrier(
     signalId: number,
     amplitude: number,
@@ -33,6 +39,12 @@ export type SignalSnapshot = {
   signalId: number;
   sampleRate: number;
   samples: Float32Array;
+};
+
+export type SignalBundle = {
+  carrier: SignalSnapshot;
+  message: SignalSnapshot;
+  modulated: SignalSnapshot;
 };
 
 let modulePromise: Promise<DspModule> | null = null;
@@ -70,6 +82,12 @@ export async function createDspClient(): Promise<DspExports> {
       "number",
       "number",
     ]),
+    amModulate: wasmModule.cwrap("dsp_am_modulate", "number", [
+      "number",
+      "number",
+      "number",
+      "number",
+    ]),
     generateCarrier: wasmModule.cwrap("dsp_generate_carrier", null, [
       "number",
       "number",
@@ -82,6 +100,27 @@ export async function createDspClient(): Promise<DspExports> {
       "number",
       "number",
     ]),
+  };
+}
+
+export async function readSignalSnapshot(signalId: number): Promise<SignalSnapshot> {
+  const dsp = await createDspClient();
+  const actualLength = dsp.getSignalLength(signalId);
+  const actualSampleRate = dsp.getSignalSampleRate(signalId);
+
+  if (actualLength <= 0 || actualSampleRate <= 0) {
+    throw new Error("WASM module returned an invalid signal.");
+  }
+
+  const samples = new Float32Array(actualLength);
+  for (let index = 0; index < actualLength; index += 1) {
+    samples[index] = dsp.getSignalSample(signalId, index);
+  }
+
+  return {
+    signalId,
+    sampleRate: actualSampleRate,
+    samples,
   };
 }
 
@@ -151,22 +190,63 @@ export async function generateCarrierSnapshot(options?: {
 
   dsp.generateCarrier(signalId, amplitude, frequency, phase);
 
-  const actualLength = dsp.getSignalLength(signalId);
-  const actualSampleRate = dsp.getSignalSampleRate(signalId);
+  return readSignalSnapshot(signalId);
+}
 
-  if (actualLength <= 0 || actualSampleRate <= 0) {
-    dsp.destroySignal(signalId);
-    throw new Error("WASM module returned an invalid carrier signal.");
+export async function generateDsbLcBundle(options?: {
+  length?: number;
+  sampleRate?: number;
+  messageAmplitude?: number;
+  messageFrequency?: number;
+  carrierAmplitude?: number;
+  carrierFrequency?: number;
+  modulationIndex?: number;
+}): Promise<SignalBundle> {
+  const {
+    length = 4096,
+    sampleRate = 4096,
+    messageAmplitude = 1,
+    messageFrequency = 1,
+    carrierAmplitude = 1,
+    carrierFrequency = 1000,
+    modulationIndex = 0.8,
+  } = options ?? {};
+  const dsp = await createDspClient();
+
+  const messageSignalId = dsp.createSignal(length, sampleRate);
+  const carrierSignalId = dsp.createSignal(length, sampleRate);
+
+  if (messageSignalId < 0 || carrierSignalId < 0) {
+    if (messageSignalId >= 0) {
+      dsp.destroySignal(messageSignalId);
+    }
+
+    if (carrierSignalId >= 0) {
+      dsp.destroySignal(carrierSignalId);
+    }
+
+    throw new Error("Failed to allocate AM signals in the WASM module.");
   }
 
-  const samples = new Float32Array(actualLength);
-  for (let index = 0; index < actualLength; index += 1) {
-    samples[index] = dsp.getSignalSample(signalId, index);
+  dsp.generateCarrier(messageSignalId, messageAmplitude, messageFrequency, 0);
+  dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, 0);
+
+  const modulatedSignalId = dsp.amModulate(
+    messageSignalId,
+    carrierFrequency,
+    carrierAmplitude,
+    modulationIndex
+  );
+
+  if (modulatedSignalId < 0) {
+    dsp.destroySignal(messageSignalId);
+    dsp.destroySignal(carrierSignalId);
+    throw new Error("Failed to generate DSB-LC signal in the WASM module.");
   }
 
   return {
-    signalId,
-    sampleRate: actualSampleRate,
-    samples,
+    message: await readSignalSnapshot(messageSignalId),
+    carrier: await readSignalSnapshot(carrierSignalId),
+    modulated: await readSignalSnapshot(modulatedSignalId),
   };
 }

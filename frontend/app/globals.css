@@ -1,24 +1,25 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f7f9fb;
+  --background: #ffffff;
   --foreground: #191c1e;
-  --ui-background: #f7f9fb;
-  --ui-text: #191c1e;
-  --ui-text-muted: #434653;
-  --ui-primary: #2156ca;
-  --ui-primary-container: #0047bb;
-  --ui-on-primary-container: #afc1ff;
-  --ui-secondary-container: #d5e3fc;
-  --ui-on-secondary-container: #57657a;
-  --ui-tertiary: #6c1f00;
-  --ui-surface: #f7f9fb;
+  --ui-background: #ffffff;
+  --ui-text: #22252a;
+  --ui-text-muted: #6d7280;
+  --ui-primary: #1f419d;
+  --ui-primary-container: #244eb2;
+  --ui-on-primary-container: #ffffff;
+  --ui-secondary-container: #dce6ff;
+  --ui-on-secondary-container: #34548c;
+  --ui-tertiary: #8b4513;
+  --ui-surface: #f8fafc;
   --ui-surface-lowest: #ffffff;
-  --ui-surface-low: #f2f4f6;
-  --ui-surface-high: #e6e8ea;
-  --ui-surface-highest: #e0e3e5;
-  --ui-outline: #737685;
-  --ui-outline-variant: #c3c6d6;
+  --ui-surface-low: #f4f6f9;
+  --ui-surface-high: #f1f3f6;
+  --ui-surface-highest: #eceff3;
+  --ui-outline: #828898;
+  --ui-outline-variant: #d4d9e2;
+  --ui-dot-grid: rgba(31, 65, 157, 0.14);
 }
 
 @theme inline {
@@ -26,29 +27,6 @@
   --color-foreground: var(--ui-text);
   --font-sans: "Segoe UI";
   --font-mono: "Consolas";
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a1115;
-    --foreground: #e8edf1;
-    --ui-background: #0a1115;
-    --ui-text: #e8edf1;
-    --ui-text-muted: #99a6b4;
-    --ui-primary: #7aa2ff;
-    --ui-primary-container: #285ad0;
-    --ui-on-primary-container: #dbe5ff;
-    --ui-secondary-container: #243447;
-    --ui-on-secondary-container: #d2e0f4;
-    --ui-tertiary: #ffb59c;
-    --ui-surface: #10181e;
-    --ui-surface-lowest: #121b21;
-    --ui-surface-low: #151f26;
-    --ui-surface-high: #1b2730;
-    --ui-surface-highest: #21303b;
-    --ui-outline: #7f8b98;
-    --ui-outline-variant: #32414d;
-  }
 }
 
 * {
@@ -61,9 +39,14 @@ body {
   color: var(--ui-text);
   font-family: "Segoe UI", "Helvetica Neue", Arial, sans-serif;
   margin: 0;
+  min-height: 100%;
 }
 
 button,
 input {
   font: inherit;
+}
+
+body {
+  padding: 0;
 }

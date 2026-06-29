@@ -6,13 +6,9 @@ export default function FrequencySpectrumPanel() {
           <span className="h-3 w-3 rounded-full bg-[color:var(--ui-tertiary)]" />
           Frequency Spectrum
         </div>
-        <div className="flex gap-2 text-xs text-[color:var(--ui-text-muted)]">
-          <button type="button" className="rounded p-1 hover:bg-[color:var(--ui-surface-high)]">
-            Expand
-          </button>
-          <button type="button" className="rounded p-1 hover:bg-[color:var(--ui-surface-high)]">
-            FFT
-          </button>
+        <div className="flex gap-3 text-xs text-[color:var(--ui-text-muted)]">
+          <button type="button">⛶</button>
+          <button type="button">✣</button>
         </div>
       </div>
 
@@ -32,9 +28,6 @@ export default function FrequencySpectrumPanel() {
             strokeWidth="1"
           />
         </svg>
-        <div className="absolute left-4 top-4 rounded bg-black/30 px-3 py-2 text-xs text-white/70">
-          FFT window placeholder. No spectral data yet.
-        </div>
         <div className="absolute bottom-2 right-2 flex gap-4 text-[10px] font-mono text-white/60">
           <span>SPAN: 2 kHz</span>
           <span>RBW: 10 Hz</span>

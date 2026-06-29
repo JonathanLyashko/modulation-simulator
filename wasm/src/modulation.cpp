@@ -66,14 +66,22 @@ int amModulate(int messageSignalId, const AmModulationParameters& parameters) {
     }
 
     const float angularFrequency = 2.0f * kPi * parameters.carrier.frequency;
+    float messagePeak = 0.0f;
+
+    for (const float sample : message->samples) {
+        messagePeak = std::max(messagePeak, std::fabs(sample));
+    }
+
+    const float normalizationFactor = messagePeak > 0.0f ? 1.0f / messagePeak : 0.0f;
 
     for (std::size_t index = 0; index < message->samples.size(); ++index) {
         const float time = static_cast<float>(index) / static_cast<float>(message->sampleRate);
         const float carrier =
             std::cos(angularFrequency * time + parameters.carrier.phase);
+        const float normalizedMessage = message->samples[index] * normalizationFactor;
         output->samples[index] =
             parameters.carrier.amplitude *
-            (1.0f + parameters.modulationIndex * message->samples[index]) *
+            (1.0f + parameters.modulationIndex * normalizedMessage) *
             carrier;
     }
 
