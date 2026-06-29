@@ -1,7 +1,7 @@
 #pragma once
 
+#include <cstddef>
 #include <vector>
-#include <memory>
 
 struct Signal {
     std::vector<float> samples;
@@ -15,3 +15,4 @@ Signal* getSignal(int id);
 float* getSignalPointer(int id);
 int getSignalLength(int id);
 int getSignalSampleRate(int id);
+std::size_t getSignalCount();

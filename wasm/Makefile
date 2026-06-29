@@ -2,7 +2,7 @@ EMCC = emcc
 
 SRC_DIR = src
 INC_DIR = include
-OUT_DIR = ../src/lib/wasm
+OUT_DIR = ../frontend/public/wasm
 
 SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 
@@ -19,6 +19,7 @@ EMFLAGS = \
 	-s WASM=1 \
 	-s MODULARIZE=1 \
 	-s EXPORT_ES6=1 \
+	-s ENVIRONMENT=web \
 	-s ALLOW_MEMORY_GROWTH=1 \
 	-s EXPORTED_FUNCTIONS=$(EXPORTS) \
 	-s EXPORTED_RUNTIME_METHODS=$(RUNTIME_EXPORTS)

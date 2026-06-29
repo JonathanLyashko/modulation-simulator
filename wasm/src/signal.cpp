@@ -1,0 +1,79 @@
+#include "signal.hpp"
+
+#include <memory>
+#include <vector>
+
+namespace {
+std::vector<std::unique_ptr<Signal>> gSignals;
+
+bool isValidSignalId(int id) {
+    return id >= 0 && static_cast<std::size_t>(id) < gSignals.size() && gSignals[id] != nullptr;
+}
+}  // namespace
+
+int createSignal(int length, int sampleRate) {
+    if (length <= 0 || sampleRate <= 0) {
+        return -1;
+    }
+
+    auto signal = std::make_unique<Signal>();
+    signal->samples.assign(static_cast<std::size_t>(length), 0.0f);
+    signal->sampleRate = sampleRate;
+
+    for (std::size_t index = 0; index < gSignals.size(); ++index) {
+        if (gSignals[index] == nullptr) {
+            gSignals[index] = std::move(signal);
+            return static_cast<int>(index);
+        }
+    }
+
+    gSignals.push_back(std::move(signal));
+    return static_cast<int>(gSignals.size() - 1);
+}
+
+void destroySignal(int id) {
+    if (!isValidSignalId(id)) {
+        return;
+    }
+
+    gSignals[id].reset();
+}
+
+Signal* getSignal(int id) {
+    if (!isValidSignalId(id)) {
+        return nullptr;
+    }
+
+    return gSignals[id].get();
+}
+
+float* getSignalPointer(int id) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr || signal->samples.empty()) {
+        return nullptr;
+    }
+
+    return signal->samples.data();
+}
+
+int getSignalLength(int id) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr) {
+        return 0;
+    }
+
+    return static_cast<int>(signal->samples.size());
+}
+
+int getSignalSampleRate(int id) {
+    Signal* signal = getSignal(id);
+    if (signal == nullptr) {
+        return 0;
+    }
+
+    return signal->sampleRate;
+}
+
+std::size_t getSignalCount() {
+    return gSignals.size();
+}
