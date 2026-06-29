@@ -28,6 +28,19 @@ float dsp_get_signal_sample(int signal_id, int sample_index) {
     return getSignalSample(signal_id, sample_index);
 }
 
+void dsp_generate_carrier(
+    int signal_id,
+    float carrier_amplitude,
+    float carrier_frequency,
+    float initial_phase
+) {
+    generateCarrier(signal_id, CarrierParameters{
+        carrier_amplitude,
+        carrier_frequency,
+        initial_phase,
+    });
+}
+
 void dsp_generate_sine(
     int signal_id,
     float amplitude,

@@ -1,8 +1,13 @@
 'use client';
 
-import { useEffect, useRef, useState } from "react";
+import { startTransition, useEffect, useRef, useState } from "react";
 
-import { createDspClient, generateSineSnapshot, type SignalSnapshot } from "@/app/lib/dspClient";
+import { createDspClient, generateCarrierSnapshot, type SignalSnapshot } from "@/app/lib/dspClient";
+
+const DEFAULT_SAMPLE_RATE = 48_000;
+const DEFAULT_SAMPLE_COUNT = 512;
+const DEFAULT_AMPLITUDE = 1;
+const DEFAULT_FREQUENCY = 1_000;
 
 function drawWaveform(canvas: HTMLCanvasElement, samples: Float32Array) {
   const context = canvas.getContext("2d");
@@ -57,28 +62,45 @@ function drawWaveform(canvas: HTMLCanvasElement, samples: Float32Array) {
 
 export default function SignalDemo() {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const activeSignalIdRef = useRef<number | null>(null);
   const [signal, setSignal] = useState<SignalSnapshot | null>(null);
+  const [carrierAmplitude, setCarrierAmplitude] = useState(DEFAULT_AMPLITUDE);
+  const [carrierFrequency, setCarrierFrequency] = useState(DEFAULT_FREQUENCY);
   const [status, setStatus] = useState("Loading WASM module...");
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let disposed = false;
-    let activeSignalId: number | null = null;
 
     async function run() {
       try {
-        setStatus("Creating signal in C++ and reading it back from WASM...");
+        setError(null);
+        setStatus("Generating carrier in C++ and reading it back from WASM...");
         const dsp = await createDspClient();
-        const snapshot = await generateSineSnapshot();
+        const snapshot = await generateCarrierSnapshot({
+          length: DEFAULT_SAMPLE_COUNT,
+          sampleRate: DEFAULT_SAMPLE_RATE,
+          amplitude: carrierAmplitude,
+          frequency: carrierFrequency,
+          phase: 0,
+        });
 
         if (disposed) {
           dsp.destroySignal(snapshot.signalId);
           return;
         }
 
-        activeSignalId = snapshot.signalId;
-        setSignal(snapshot);
-        setStatus("Vertical slice is working.");
+        const previousSignalId = activeSignalIdRef.current;
+        activeSignalIdRef.current = snapshot.signalId;
+
+        if (previousSignalId !== null) {
+          dsp.destroySignal(previousSignalId);
+        }
+
+        startTransition(() => {
+          setSignal(snapshot);
+          setStatus("Carrier controls are connected to the DSP layer.");
+        });
       } catch (cause) {
         if (disposed) {
           return;
@@ -87,7 +109,7 @@ export default function SignalDemo() {
         const message =
           cause instanceof Error ? cause.message : "Unknown error while loading WASM.";
         setError(message);
-        setStatus("The UI loaded, but the DSP module did not.");
+        setStatus("The UI loaded, but the carrier generator did not.");
       }
     }
 
@@ -95,9 +117,13 @@ export default function SignalDemo() {
 
     return () => {
       disposed = true;
+    };
+  }, [carrierAmplitude, carrierFrequency]);
 
-      if (activeSignalId !== null) {
-        const signalId = activeSignalId;
+  useEffect(() => {
+    return () => {
+      const signalId = activeSignalIdRef.current;
+      if (signalId !== null) {
         void createDspClient().then((dsp) => {
           dsp.destroySignal(signalId);
         });
@@ -121,12 +147,15 @@ export default function SignalDemo() {
             Phase 1 Proof of Concept
           </p>
           <h1 className="mt-3 text-4xl font-semibold tracking-tight">
-            C++ Signal to WASM to Next.js
+            Single Carrier From C++ to WASM to Next.js
           </h1>
           <p className="mt-3 max-w-3xl text-base leading-7 text-[color:var(--muted)]">
-            This page creates a signal in the WASM module, fills it with a sine
-            wave in C++, copies the samples back into JavaScript, and plots
-            them in a toy UI.
+            This page generates a single carrier waveform using the standard form
+            <span className="mx-2 rounded-md border border-white/10 bg-black/20 px-2 py-1 font-mono text-sm text-[color:var(--accent)]">
+              c(t)=A_c*cos(2pif_ct)
+            </span>
+            in C++, copies the samples back into JavaScript, and redraws the UI
+            whenever you change the carrier settings.
           </p>
         </header>
 
@@ -138,8 +167,66 @@ export default function SignalDemo() {
                 <p className="text-sm text-[color:var(--muted)]">{status}</p>
               </div>
               <div className="rounded-full border border-white/10 bg-black/20 px-3 py-1 text-xs tracking-[0.18em] text-[color:var(--accent)]">
-                SINE
+                CARRIER
               </div>
+            </div>
+
+            <div className="mb-5 grid gap-4 rounded-[22px] border border-white/10 bg-black/10 p-4 md:grid-cols-2">
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-[color:var(--muted)]">
+                  Carrier Amplitude A_c
+                </span>
+                <input
+                  type="range"
+                  min="0.1"
+                  max="2"
+                  step="0.05"
+                  value={carrierAmplitude}
+                  onChange={(event) => {
+                    setCarrierAmplitude(Number(event.target.value));
+                  }}
+                  className="accent-[color:var(--accent)]"
+                />
+                <input
+                  type="number"
+                  min="0.1"
+                  max="2"
+                  step="0.05"
+                  value={carrierAmplitude}
+                  onChange={(event) => {
+                    setCarrierAmplitude(Number(event.target.value));
+                  }}
+                  className="rounded-xl border border-white/10 bg-[#0b1512] px-3 py-2 text-sm text-foreground outline-none ring-0"
+                />
+              </label>
+
+              <label className="flex flex-col gap-2">
+                <span className="text-sm font-medium text-[color:var(--muted)]">
+                  Carrier Frequency f_c (Hz)
+                </span>
+                <input
+                  type="range"
+                  min="100"
+                  max="5000"
+                  step="50"
+                  value={carrierFrequency}
+                  onChange={(event) => {
+                    setCarrierFrequency(Number(event.target.value));
+                  }}
+                  className="accent-[color:var(--accent)]"
+                />
+                <input
+                  type="number"
+                  min="100"
+                  max="5000"
+                  step="50"
+                  value={carrierFrequency}
+                  onChange={(event) => {
+                    setCarrierFrequency(Number(event.target.value));
+                  }}
+                  className="rounded-xl border border-white/10 bg-[#0b1512] px-3 py-2 text-sm text-foreground outline-none ring-0"
+                />
+              </label>
             </div>
 
             <canvas
@@ -154,6 +241,12 @@ export default function SignalDemo() {
           <aside className="rounded-[28px] border border-white/10 bg-[color:var(--panel)]/90 p-5 shadow-[0_24px_80px_rgba(0,0,0,0.18)]">
             <h2 className="text-lg font-semibold">Slice Status</h2>
             <dl className="mt-4 space-y-4 text-sm">
+              <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
+                <dt className="text-[color:var(--muted)]">Current Carrier</dt>
+                <dd className="mt-2 font-mono text-xs leading-6 text-[color:var(--accent)]">
+                  {`c(t)=${carrierAmplitude.toFixed(2)}*cos(2pi*${carrierFrequency.toFixed(0)}*t)`}
+                </dd>
+              </div>
               <div className="rounded-2xl border border-white/10 bg-black/10 p-4">
                 <dt className="text-[color:var(--muted)]">Samples</dt>
                 <dd className="mt-1 text-2xl font-semibold">

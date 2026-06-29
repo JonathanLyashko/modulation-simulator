@@ -22,6 +22,21 @@ int createOutputLike(const Signal& source) {
 }
 }
 
+void generateCarrier(int signalId, const CarrierParameters& parameters) {
+    Signal* signal = getWritableSignal(signalId);
+    if (signal == nullptr) {
+        return;
+    }
+
+    const float angularFrequency = 2.0f * kPi * parameters.frequency;
+
+    for (std::size_t index = 0; index < signal->samples.size(); ++index) {
+        const float time = static_cast<float>(index) / static_cast<float>(signal->sampleRate);
+        signal->samples[index] =
+            parameters.amplitude * std::cos(angularFrequency * time + parameters.phase);
+    }
+}
+
 void generateSine(int signalId, const ToneParameters& parameters) {
     Signal* signal = getWritableSignal(signalId);
     if (signal == nullptr) {

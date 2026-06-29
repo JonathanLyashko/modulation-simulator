@@ -15,6 +15,12 @@ type DspExports = {
   getSignalLength(signalId: number): number;
   getSignalSampleRate(signalId: number): number;
   getSignalSample(signalId: number, sampleIndex: number): number;
+  generateCarrier(
+    signalId: number,
+    amplitude: number,
+    frequency: number,
+    phase: number
+  ): void;
   generateSine(
     signalId: number,
     amplitude: number,
@@ -64,6 +70,12 @@ export async function createDspClient(): Promise<DspExports> {
       "number",
       "number",
     ]),
+    generateCarrier: wasmModule.cwrap("dsp_generate_carrier", null, [
+      "number",
+      "number",
+      "number",
+      "number",
+    ]),
     generateSine: wasmModule.cwrap("dsp_generate_sine", null, [
       "number",
       "number",
@@ -102,6 +114,49 @@ export async function generateSineSnapshot(options?: {
   if (actualLength <= 0 || actualSampleRate <= 0) {
     dsp.destroySignal(signalId);
     throw new Error("WASM module returned an invalid signal.");
+  }
+
+  const samples = new Float32Array(actualLength);
+  for (let index = 0; index < actualLength; index += 1) {
+    samples[index] = dsp.getSignalSample(signalId, index);
+  }
+
+  return {
+    signalId,
+    sampleRate: actualSampleRate,
+    samples,
+  };
+}
+
+export async function generateCarrierSnapshot(options?: {
+  length?: number;
+  sampleRate?: number;
+  amplitude?: number;
+  frequency?: number;
+  phase?: number;
+}): Promise<SignalSnapshot> {
+  const {
+    length = 512,
+    sampleRate = 48_000,
+    amplitude = 1,
+    frequency = 1_000,
+    phase = 0,
+  } = options ?? {};
+  const dsp = await createDspClient();
+  const signalId = dsp.createSignal(length, sampleRate);
+
+  if (signalId < 0) {
+    throw new Error("Failed to allocate carrier signal in WASM module.");
+  }
+
+  dsp.generateCarrier(signalId, amplitude, frequency, phase);
+
+  const actualLength = dsp.getSignalLength(signalId);
+  const actualSampleRate = dsp.getSignalSampleRate(signalId);
+
+  if (actualLength <= 0 || actualSampleRate <= 0) {
+    dsp.destroySignal(signalId);
+    throw new Error("WASM module returned an invalid carrier signal.");
   }
 
   const samples = new Float32Array(actualLength);
