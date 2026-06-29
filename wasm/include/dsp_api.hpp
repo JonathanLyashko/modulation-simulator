@@ -22,4 +22,20 @@ extern "C" {
         float carrier_amplitude,
         float modulation_index
     );
+
+    int dsp_fm_modulate(
+        int message_signal_id,
+        float carrier_frequency,
+        float carrier_amplitude,
+        float frequency_sensitivity,
+        float initial_phase
+    );
+
+    int dsp_pm_modulate(
+        int message_signal_id,
+        float carrier_frequency,
+        float carrier_amplitude,
+        float phase_sensitivity,
+        float initial_phase
+    );
 }

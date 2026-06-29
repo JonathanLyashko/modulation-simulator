@@ -34,7 +34,11 @@ void dsp_generate_sine(
     float frequency,
     float phase
 ) {
-    generateSine(signal_id, amplitude, frequency, phase);
+    generateSine(signal_id, ToneParameters{
+        amplitude,
+        frequency,
+        phase,
+    });
 }
 
 int dsp_am_modulate(
@@ -43,11 +47,47 @@ int dsp_am_modulate(
     float carrier_amplitude,
     float modulation_index
 ) {
-    return amModulate(
-        message_signal_id,
-        carrier_frequency,
-        carrier_amplitude,
-        modulation_index
-    );
+    return amModulate(message_signal_id, AmModulationParameters{
+        CarrierParameters{
+            carrier_amplitude,
+            carrier_frequency,
+            0.0f,
+        },
+        modulation_index,
+    });
+}
+
+int dsp_fm_modulate(
+    int message_signal_id,
+    float carrier_frequency,
+    float carrier_amplitude,
+    float frequency_sensitivity,
+    float initial_phase
+) {
+    return fmModulate(message_signal_id, FmModulationParameters{
+        CarrierParameters{
+            carrier_amplitude,
+            carrier_frequency,
+            initial_phase,
+        },
+        frequency_sensitivity,
+    });
+}
+
+int dsp_pm_modulate(
+    int message_signal_id,
+    float carrier_frequency,
+    float carrier_amplitude,
+    float phase_sensitivity,
+    float initial_phase
+) {
+    return pmModulate(message_signal_id, PmModulationParameters{
+        CarrierParameters{
+            carrier_amplitude,
+            carrier_frequency,
+            initial_phase,
+        },
+        phase_sensitivity,
+    });
 }
 }
