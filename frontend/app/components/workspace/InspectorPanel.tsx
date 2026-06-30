@@ -407,6 +407,51 @@ function ModulationEquationCard({
   );
 }
 
+function PiSymbol() {
+  return <span>π</span>;
+}
+
+function HilbertMSymbol() {
+  return (
+    <span className="inline-flex items-start">
+      <span className="italic">m</span>
+      <span className="-ml-[0.48em] -translate-y-[0.38em] text-[0.72em]">^</span>
+    </span>
+  );
+}
+
+function SsbExpression({
+  sideband,
+}: {
+  sideband: SsbSideband;
+}) {
+  return (
+    <>
+      <span className="italic">A</span>
+      <sub>c</sub>
+      <span>[</span>
+      <span className="italic">m</span>
+      <span>(t) </span>
+      <span className="italic">cos</span>
+      <span>(2</span>
+      <PiSymbol />
+      <span className="italic">f</span>
+      <sub>c</sub>
+      <span>t) </span>
+      <span>{sideband === "USB" ? "-" : "+"}</span>
+      <span> </span>
+      <HilbertMSymbol />
+      <span>(t) </span>
+      <span className="italic">sin</span>
+      <span>(2</span>
+      <PiSymbol />
+      <span className="italic">f</span>
+      <sub>c</sub>
+      <span>t)]</span>
+    </>
+  );
+}
+
 function AmplitudeGauge({
   amplitude,
   onChange,
@@ -812,24 +857,30 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
-          <ModulationEquationCard
+          {isSsbMode ? (
+            <ModulationEquationCard
+              title={`${ssbSideband} equation`}
+              leftSide={
+                <>
+                  <span className="italic">u</span>
+                  <sub>SSB</sub>
+                  <span>(t)</span>
+                </>
+              }
+              expression={<SsbExpression sideband={ssbSideband} />}
+            />
+          ) : null}
+          {!isSsbMode ? (
+            <ModulationEquationCard
             title={
               supportsModulationIndex
                 ? "Large-carrier AM equation"
-                : isSsbMode
-                  ? `${ssbSideband} equation`
                 : "Suppressed-carrier equation"
             }
             leftSide={
               supportsModulationIndex ? (
                 <>
                   <span className="italic">u</span>
-                  <span>(t)</span>
-                </>
-              ) : isSsbMode ? (
-                <>
-                  <span className="italic">u</span>
-                  <sub>SSB</sub>
                   <span>(t)</span>
                 </>
               ) : (
@@ -900,6 +951,7 @@ export default function InspectorPanel({
                   )
             }
           />
+          ) : null}
           {isSsbMode ? (
             <div className="space-y-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
               <div className="flex items-center justify-between">
