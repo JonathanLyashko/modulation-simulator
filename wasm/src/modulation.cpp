@@ -1,9 +1,11 @@
 #include "modulation.hpp"
 
+#include "fft.hpp"
 #include "signal.hpp"
 #include "signal_ops.hpp"
 
 #include <cmath>
+#include <vector>
 
 namespace {
 constexpr float kPi = 3.14159265358979323846f;
@@ -111,6 +113,44 @@ int dsbScModulate(
             std::cos(angularFrequency * time + parameters.carrier.phase);
         output->samples[index] =
             parameters.carrier.amplitude * message->samples[index] * carrier;
+    }
+
+    return outputSignalId;
+}
+
+int ssbModulate(
+    int messageSignalId,
+    const SsbModulationParameters& parameters
+) {
+    Signal* message = getWritableSignal(messageSignalId);
+    if (message == nullptr) {
+        return -1;
+    }
+
+    std::vector<float> hilbertSamples;
+    if (!computeHilbertTransform(message->samples, &hilbertSamples)) {
+        return -1;
+    }
+
+    const int outputSignalId = createOutputLike(*message);
+    Signal* output = getSignal(outputSignalId);
+    if (output == nullptr) {
+        return -1;
+    }
+
+    const float angularFrequency = 2.0f * kPi * parameters.carrier.frequency;
+    const float hilbertSign =
+        parameters.sideband == SsbSideband::Upper ? -1.0f : 1.0f;
+
+    for (std::size_t index = 0; index < message->samples.size(); ++index) {
+        const float time = static_cast<float>(index) / static_cast<float>(message->sampleRate);
+        const float phase = angularFrequency * time + parameters.carrier.phase;
+        const float inPhaseTerm = message->samples[index] * std::cos(phase);
+        const float quadratureTerm = hilbertSamples[index] * std::sin(phase);
+
+        output->samples[index] =
+            parameters.carrier.amplitude *
+            (inPhaseTerm + hilbertSign * quadratureTerm);
     }
 
     return outputSignalId;

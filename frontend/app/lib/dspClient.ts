@@ -1,6 +1,6 @@
 'use client';
 
-import type { MessageComponent } from "@/app/components/workspace/types";
+import type { MessageComponent, SsbSideband } from "@/app/components/workspace/types";
 
 type DspModule = {
   cwrap: <T extends (...args: number[]) => number | void>(
@@ -44,6 +44,13 @@ type DspExports = {
     carrierFrequency: number,
     carrierAmplitude: number,
     initialPhase: number
+  ): number;
+  ssbModulate(
+    messageSignalId: number,
+    carrierFrequency: number,
+    carrierAmplitude: number,
+    initialPhase: number,
+    sideband: number
   ): number;
   generateCarrier(
     signalId: number,
@@ -135,6 +142,13 @@ export async function createDspClient(): Promise<DspExports> {
       "number",
     ]),
     dsbScModulate: wasmModule.cwrap("dsp_dsb_sc_modulate", "number", [
+      "number",
+      "number",
+      "number",
+      "number",
+    ]),
+    ssbModulate: wasmModule.cwrap("dsp_ssb_modulate", "number", [
+      "number",
       "number",
       "number",
       "number",
@@ -387,6 +401,83 @@ export async function generateDsbScBundle(options?: {
     dsp.destroySignal(messageSignalId);
     dsp.destroySignal(carrierSignalId);
     throw new Error("Failed to generate DSB-SC signal in the WASM module.");
+  }
+
+  return {
+    message: await readSignalSnapshot(messageSignalId),
+    carrier: await readSignalSnapshot(carrierSignalId),
+    modulated: await readSignalSnapshot(modulatedSignalId),
+  };
+}
+
+export async function generateSsbBundle(options?: {
+  length?: number;
+  sampleRate?: number;
+  messageComponents?: MessageComponent[];
+  carrierAmplitude?: number;
+  carrierFrequency?: number;
+  carrierPhase?: number;
+  sideband?: SsbSideband;
+}): Promise<SignalBundle> {
+  const {
+    length = 4096,
+    sampleRate = 4096,
+    messageComponents = [],
+    carrierAmplitude = 1,
+    carrierFrequency = 1000,
+    carrierPhase = 0,
+    sideband = "USB",
+  } = options ?? {};
+  const dsp = await createDspClient();
+
+  const messageSignalId = dsp.createSignal(length, sampleRate);
+  const carrierSignalId = dsp.createSignal(length, sampleRate);
+
+  if (messageSignalId < 0 || carrierSignalId < 0) {
+    if (messageSignalId >= 0) {
+      dsp.destroySignal(messageSignalId);
+    }
+
+    if (carrierSignalId >= 0) {
+      dsp.destroySignal(carrierSignalId);
+    }
+
+    throw new Error("Failed to allocate SSB signals in the WASM module.");
+  }
+
+  dsp.clearSignal(messageSignalId);
+  for (const component of messageComponents) {
+    if (component.type === "sine") {
+      dsp.addSineComponent(
+        messageSignalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    } else {
+      dsp.addCosineComponent(
+        messageSignalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    }
+  }
+
+  dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
+
+  const modulatedSignalId = dsp.ssbModulate(
+    messageSignalId,
+    carrierFrequency,
+    carrierAmplitude,
+    carrierPhase,
+    sideband === "USB" ? 1 : -1
+  );
+
+  if (modulatedSignalId < 0) {
+    dsp.destroySignal(messageSignalId);
+    dsp.destroySignal(carrierSignalId);
+    throw new Error("Failed to generate SSB signal in the WASM module.");
   }
 
   return {

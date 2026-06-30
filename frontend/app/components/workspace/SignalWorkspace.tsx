@@ -7,6 +7,7 @@ import {
   createDspClient,
   generateDsbScBundle,
   generateDsbLcBundle,
+  generateSsbBundle,
   readSignalSnapshot,
 } from "@/app/lib/dspClient";
 
@@ -36,6 +37,7 @@ import type {
   PlotSettings,
   SignalSnapshot,
   SignalView,
+  SsbSideband,
   SpectrumDisplayMode,
 } from "./types";
 
@@ -82,7 +84,7 @@ function createDefaultFrequencyPlotSettings(
   };
 }
 
-const SUPPORTED_AMPLITUDE_SCHEMES: AnalogAmplitudeScheme[] = ["DSB-LC", "DSB-SC"];
+const SUPPORTED_AMPLITUDE_SCHEMES: AnalogAmplitudeScheme[] = ["DSB-LC", "DSB-SC", "SSB"];
 
 export default function SignalWorkspace() {
   const activeSignalIdsRef = useRef<number[]>([]);
@@ -106,6 +108,10 @@ export default function SignalWorkspace() {
     useState<AnalogAmplitudeScheme>("DSB-LC");
   const [activeAngleScheme, setActiveAngleScheme] =
     useState<AnalogAngleScheme>("FM");
+  const [activeModulationFamily, setActiveModulationFamily] = useState<
+    "amplitude" | "angle"
+  >("amplitude");
+  const [ssbSideband, setSsbSideband] = useState<SsbSideband>("USB");
   const [selectedSignalView, setSelectedSignalView] =
     useState<SignalView>("modulated");
   const [settings, setSettings] = useState<ModulatorSettings>(
@@ -202,7 +208,12 @@ export default function SignalWorkspace() {
         const bundle =
           activeAmplitudeScheme === "DSB-SC"
             ? await generateDsbScBundle(sharedOptions)
-            : await generateDsbLcBundle({
+            : activeAmplitudeScheme === "SSB"
+              ? await generateSsbBundle({
+                  ...sharedOptions,
+                  sideband: ssbSideband,
+                })
+              : await generateDsbLcBundle({
                 ...sharedOptions,
                 modulationIndex: settings.modulationIndex,
               });
@@ -296,7 +307,14 @@ export default function SignalWorkspace() {
     return () => {
       disposed = true;
     };
-  }, [activeAmplitudeScheme, frequencyPlotSettings.fftSize, sampleCount, sampleRate, settings]);
+  }, [
+    activeAmplitudeScheme,
+    frequencyPlotSettings.fftSize,
+    sampleCount,
+    sampleRate,
+    settings,
+    ssbSideband,
+  ]);
 
   useEffect(() => {
     return () => {
@@ -462,10 +480,12 @@ export default function SignalWorkspace() {
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
           <SideNav
+            activeFamily={activeModulationFamily}
             activeAmplitudeScheme={activeAmplitudeScheme}
             activeAngleScheme={activeAngleScheme}
             collapsed={isLeftSidebarCollapsed}
             onSelectAmplitudeScheme={(scheme) => {
+              setActiveModulationFamily("amplitude");
               setActiveAmplitudeScheme(scheme);
               if (
                 !SUPPORTED_AMPLITUDE_SCHEMES.includes(scheme) &&
@@ -474,7 +494,10 @@ export default function SignalWorkspace() {
                 setSelectedSignalView("message");
               }
             }}
-            onSelectAngleScheme={setActiveAngleScheme}
+            onSelectAngleScheme={(scheme) => {
+              setActiveModulationFamily("angle");
+              setActiveAngleScheme(scheme);
+            }}
             onToggleCollapsed={() => {
               setIsLeftSidebarCollapsed((current) => !current);
             }}
@@ -509,6 +532,7 @@ export default function SignalWorkspace() {
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
             messageComponents={settings.messageComponents}
+            ssbSideband={ssbSideband}
             collapsed={isRightSidebarCollapsed}
             onCarrierAmplitudeChange={(value) => {
               if (Number.isFinite(value)) {
@@ -604,6 +628,7 @@ export default function SignalWorkspace() {
                 }));
               }
             }}
+            onSsbSidebandChange={setSsbSideband}
             onPlotSignalVisibilityChange={(view, visible) => {
               setPlotSettings((current) => ({
                 ...current,

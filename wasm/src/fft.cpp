@@ -18,7 +18,7 @@ std::size_t nextPowerOfTwo(std::size_t value) {
     return result;
 }
 
-void fftInPlace(std::vector<std::complex<float>>& samples) {
+void fftInPlace(std::vector<std::complex<float>>& samples, bool inverse = false) {
     const std::size_t sampleCount = samples.size();
 
     std::size_t j = 0;
@@ -36,7 +36,8 @@ void fftInPlace(std::vector<std::complex<float>>& samples) {
     }
 
     for (std::size_t len = 2; len <= sampleCount; len <<= 1) {
-        const float angle = -2.0f * kPi / static_cast<float>(len);
+        const float angle =
+            (inverse ? 2.0f : -2.0f) * kPi / static_cast<float>(len);
         const std::complex<float> wLen(std::cos(angle), std::sin(angle));
 
         for (std::size_t i = 0; i < sampleCount; i += len) {
@@ -49,6 +50,13 @@ void fftInPlace(std::vector<std::complex<float>>& samples) {
                 samples[i + jInner + len / 2] = even - odd;
                 w *= wLen;
             }
+        }
+    }
+
+    if (inverse) {
+        const float normalization = 1.0f / static_cast<float>(sampleCount);
+        for (std::complex<float>& sample : samples) {
+            sample *= normalization;
         }
     }
 }
@@ -108,4 +116,49 @@ int fftMagnitudeSpectrum(int signalId, int requestedFftSize) {
 
 int fftMagnitudeSpectrum(int signalId) {
     return fftMagnitudeSpectrum(signalId, 0);
+}
+
+bool computeHilbertTransform(
+    const std::vector<float>& inputSamples,
+    std::vector<float>* outputSamples
+) {
+    if (outputSamples == nullptr || inputSamples.empty()) {
+        return false;
+    }
+
+    const std::size_t inputLength = inputSamples.size();
+    const std::size_t paddedLength = nextPowerOfTwo(std::max<std::size_t>(inputLength * 2, 1));
+    std::vector<std::complex<float>> analyticSamples(
+        paddedLength,
+        std::complex<float>(0.0f, 0.0f)
+    );
+
+    for (std::size_t index = 0; index < inputLength; ++index) {
+        analyticSamples[index] = std::complex<float>(inputSamples[index], 0.0f);
+    }
+
+    fftInPlace(analyticSamples);
+
+    analyticSamples[0] *= 1.0f;
+    if (paddedLength % 2 == 0) {
+        analyticSamples[paddedLength / 2] *= 1.0f;
+    }
+
+    const std::size_t positiveFrequencyLimit = paddedLength / 2;
+    for (std::size_t index = 1; index < positiveFrequencyLimit; ++index) {
+        analyticSamples[index] *= 2.0f;
+    }
+
+    for (std::size_t index = positiveFrequencyLimit + 1; index < paddedLength; ++index) {
+        analyticSamples[index] = std::complex<float>(0.0f, 0.0f);
+    }
+
+    fftInPlace(analyticSamples, true);
+
+    outputSamples->resize(inputLength);
+    for (std::size_t index = 0; index < inputLength; ++index) {
+        (*outputSamples)[index] = analyticSamples[index].imag();
+    }
+
+    return true;
 }

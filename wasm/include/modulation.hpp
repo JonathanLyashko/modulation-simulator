@@ -21,6 +21,16 @@ struct DsbScModulationParameters {
     CarrierParameters carrier;
 };
 
+enum class SsbSideband {
+    Upper,
+    Lower,
+};
+
+struct SsbModulationParameters {
+    CarrierParameters carrier;
+    SsbSideband sideband;
+};
+
 struct FmModulationParameters {
     CarrierParameters carrier;
     float frequencySensitivity;
@@ -37,6 +47,10 @@ int amModulate(int messageSignalId, const AmModulationParameters& parameters);
 int dsbScModulate(
     int messageSignalId,
     const DsbScModulationParameters& parameters
+);
+int ssbModulate(
+    int messageSignalId,
+    const SsbModulationParameters& parameters
 );
 int fmModulate(int messageSignalId, const FmModulationParameters& parameters);
 int pmModulate(int messageSignalId, const PmModulationParameters& parameters);

@@ -53,6 +53,14 @@ extern "C" {
         float initial_phase
     );
 
+    int dsp_ssb_modulate(
+        int message_signal_id,
+        float carrier_frequency,
+        float carrier_amplitude,
+        float initial_phase,
+        int sideband
+    );
+
     int dsp_fm_modulate(
         int message_signal_id,
         float carrier_frequency,

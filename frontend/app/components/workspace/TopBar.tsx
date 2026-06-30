@@ -55,13 +55,13 @@ export default function TopBar({
             type="button"
             className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
           >
-            Analysis
+            Learn
           </button>
           <button
             type="button"
             className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
           >
-            Library
+            Documentation
           </button>
         </nav>
       </div>

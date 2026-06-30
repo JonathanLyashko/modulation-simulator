@@ -3,6 +3,7 @@ import { useState } from "react";
 import type { AnalogAmplitudeScheme, AnalogAngleScheme } from "./types";
 
 type SideNavProps = {
+  activeFamily: "amplitude" | "angle";
   activeAmplitudeScheme: AnalogAmplitudeScheme;
   activeAngleScheme: AnalogAngleScheme;
   collapsed: boolean;
@@ -11,19 +12,49 @@ type SideNavProps = {
   onToggleCollapsed: () => void;
 };
 
-const AM_VARIANTS = ["DSB-LC", "DSB-SC", "SSB+", "SSB_"] as const;
+const AM_VARIANTS = ["DSB-LC", "DSB-SC", "SSB"] as const;
 const ANGLE_VARIANTS = ["FM", "PM"] as const;
+
+function ChevronIcon({
+  direction,
+  className = "",
+}: {
+  direction: "left" | "right" | "down";
+  className?: string;
+}) {
+  const rotationClass =
+    direction === "left"
+      ? "rotate-180"
+      : direction === "down"
+        ? "rotate-90"
+        : "";
+
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      className={`h-3.5 w-3.5 ${rotationClass} ${className}`.trim()}
+      fill="none"
+    >
+      <path
+        d="M4 2.5L7.5 6L4 9.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function LibraryGroupButton({
   label,
   icon,
-  active,
   expanded,
   onClick,
 }: {
   label: string;
   icon: string;
-  active: boolean;
   expanded: boolean;
   onClick: () => void;
 }) {
@@ -33,23 +64,23 @@ function LibraryGroupButton({
       onClick={onClick}
       className={[
         "flex w-full items-center gap-3 rounded-[4px] px-3 py-2 text-sm transition-colors",
-        active
-          ? "bg-[color:var(--ui-secondary-container)] text-[color:var(--ui-on-secondary-container)]"
-          : "text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+        "text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
       ].join(" ")}
     >
       <span className="inline-flex h-7 w-7 items-center justify-center text-[12px] font-semibold text-[color:var(--ui-primary)]">
         {icon}
       </span>
-      <span className={active ? "font-semibold" : ""}>{label}</span>
-      <span className="ml-auto text-[10px] text-[color:var(--ui-outline)]">
-        {expanded ? "v" : ">"}
-      </span>
+      <span>{label}</span>
+      <ChevronIcon
+        direction={expanded ? "down" : "right"}
+        className="ml-auto text-[color:var(--ui-outline)]"
+      />
     </button>
   );
 }
 
 export default function SideNav({
+  activeFamily,
   activeAmplitudeScheme,
   activeAngleScheme,
   collapsed,
@@ -70,7 +101,7 @@ export default function SideNav({
           aria-label="Expand left sidebar"
           title="Expand library"
         >
-          &gt;
+          <ChevronIcon direction="right" />
         </button>
         <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[color:var(--ui-primary-container)] text-[11px] font-bold text-[color:var(--ui-on-primary-container)]">
           DSP
@@ -107,7 +138,7 @@ export default function SideNav({
             aria-label="Collapse left sidebar"
             title="Collapse library"
           >
-            &lt;
+            <ChevronIcon direction="left" />
           </button>
         </div>
         <div className="flex items-center gap-3">
@@ -132,7 +163,6 @@ export default function SideNav({
           <LibraryGroupButton
             label="Amplitude Modulation"
             icon="AM"
-            active
             expanded={amExpanded}
             onClick={() => {
               setAmExpanded((current) => !current);
@@ -149,7 +179,7 @@ export default function SideNav({
                   }}
                   className={[
                     "block w-full rounded-[3px] px-2 py-1 text-left text-[12px]",
-                    activeAmplitudeScheme === variant
+                    activeFamily === "amplitude" && activeAmplitudeScheme === variant
                       ? "bg-[color:var(--ui-secondary-container)] font-semibold text-[color:var(--ui-on-secondary-container)]"
                       : "text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-lowest)]",
                   ].join(" ")}
@@ -165,7 +195,6 @@ export default function SideNav({
           <LibraryGroupButton
             label="Angle Modulation"
             icon="PM"
-            active={activeAngleScheme === "FM" || activeAngleScheme === "PM"}
             expanded={angleExpanded}
             onClick={() => {
               setAngleExpanded((current) => !current);
@@ -182,7 +211,7 @@ export default function SideNav({
                   }}
                   className={[
                     "block w-full rounded-[3px] px-2 py-1 text-left text-[12px]",
-                    activeAngleScheme === variant
+                    activeFamily === "angle" && activeAngleScheme === variant
                       ? "bg-[color:var(--ui-secondary-container)] font-semibold text-[color:var(--ui-on-secondary-container)]"
                       : "text-[color:var(--ui-text-muted)] hover:bg-[color:var(--ui-surface-lowest)]",
                   ].join(" ")}

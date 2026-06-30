@@ -44,6 +44,7 @@ export type SignalSnapshot = {
 export type SignalView = "message" | "carrier" | "modulated";
 export type SpectrumDisplayMode = "magnitude" | "db";
 
-export type AnalogAmplitudeScheme = "DSB-LC" | "DSB-SC" | "SSB+" | "SSB_";
+export type AnalogAmplitudeScheme = "DSB-LC" | "DSB-SC" | "SSB";
 
 export type AnalogAngleScheme = "FM" | "PM";
+export type SsbSideband = "USB" | "LSB";

@@ -13,6 +13,7 @@ import type {
   OscillatorSettings,
   PlotSettings,
   SignalView,
+  SsbSideband,
   SpectrumDisplayMode,
 } from "./types";
 
@@ -27,6 +28,7 @@ type InspectorPanelProps = {
   isAudioPlaying: boolean;
   audioStatus: string;
   messageComponents: MessageComponent[];
+  ssbSideband: SsbSideband;
   collapsed: boolean;
   onCarrierAmplitudeChange: (value: number) => void;
   onCarrierFrequencyChange: (value: number) => void;
@@ -39,6 +41,7 @@ type InspectorPanelProps = {
   ) => void;
   onRemoveMessageComponent: (componentId: string) => void;
   onModulationIndexChange: (value: number) => void;
+  onSsbSidebandChange: (sideband: SsbSideband) => void;
   onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
   onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
   onPlotSignalYScaleChange: (view: SignalView, value: number) => void;
@@ -106,6 +109,59 @@ function RangeField({
   );
 }
 
+function CompactRangeField({
+  title,
+  valueLabel,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+}: {
+  title: string;
+  valueLabel: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  onChange: (value: number) => void;
+}) {
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center justify-between gap-3">
+        <span className="text-sm text-[color:var(--ui-text-muted)]">{title}</span>
+        <span className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
+          {valueLabel}
+        </span>
+      </div>
+      <div className="grid grid-cols-[1fr_104px] items-center gap-3">
+        <input
+          type="range"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(event) => {
+            onChange(Number(event.target.value));
+          }}
+          className="w-full accent-[color:var(--ui-primary)]"
+        />
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={value}
+          onChange={(event) => {
+            onChange(Number(event.target.value));
+          }}
+          className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-2 py-1.5 text-center font-mono"
+        />
+      </div>
+    </div>
+  );
+}
+
 function FrequencyPlotSettingsSection({
   frequencyPlotSettings,
   sampleRate,
@@ -127,7 +183,6 @@ function FrequencyPlotSettingsSection({
   onYScaleChange: (value: number) => void;
   onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
 }) {
-  const frequencyPerDivision = frequencyPlotSettings.spanHz / 10;
   const nyquistHz = sampleRate / 2;
   const minimumSpan = Math.max(fftResolutionHz * 4, 20);
 
@@ -228,17 +283,6 @@ function FrequencyPlotSettingsSection({
         step={Math.max(fftResolutionHz, 1)}
         value={frequencyPlotSettings.centerHz}
         onChange={onCenterChange}
-      />
-      <RangeField
-        title="Frequency / Div"
-        valueLabel={`${frequencyPerDivision.toFixed(0)} Hz/div`}
-        min={minimumSpan / 10}
-        max={sampleRate / 10}
-        step={Math.max(fftResolutionHz / 10, 1)}
-        value={frequencyPerDivision}
-        onChange={(value) => {
-          onSpanChange(value * 10);
-        }}
       />
       <RangeField
         title="Y Axis Scale"
@@ -519,14 +563,14 @@ function MessageComponentEditor({
   onRemove: (componentId: string) => void;
 }) {
   return (
-    <div className="space-y-4 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
-      <div className="flex items-center justify-between">
+    <div className="space-y-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+      <div className="flex items-start justify-between gap-3">
         <div className="flex items-center gap-2">
-          <span className="rounded-full bg-[color:var(--ui-primary)]/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-primary)]">
+          <span className="rounded-full bg-[color:var(--ui-primary)]/10 px-2 py-1 text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-primary)]">
             {component.type}
           </span>
           <span className="text-sm font-medium text-[color:var(--ui-text)]">
-            {component.type === "sine" ? "Sine Component" : "Cosine Component"}
+            {component.type === "sine" ? "Sine" : "Cosine"}
           </span>
         </div>
         {canRemove ? (
@@ -542,7 +586,7 @@ function MessageComponentEditor({
         ) : null}
       </div>
 
-      <RangeField
+      <CompactRangeField
         title="Frequency"
         valueLabel={`${component.frequency.toFixed(component.frequency < 10 ? 1 : 0)} Hz`}
         min={0.1}
@@ -553,7 +597,7 @@ function MessageComponentEditor({
           onUpdate(component.id, "frequency", value);
         }}
       />
-      <RangeField
+      <CompactRangeField
         title="Magnitude"
         valueLabel={component.amplitude.toFixed(2)}
         min={0}
@@ -564,7 +608,7 @@ function MessageComponentEditor({
           onUpdate(component.id, "amplitude", value);
         }}
       />
-      <RangeField
+      <CompactRangeField
         title="Phase Offset"
         valueLabel={`${component.phase.toFixed(0)} deg`}
         min={0}
@@ -651,6 +695,7 @@ export default function InspectorPanel({
   isAudioPlaying,
   audioStatus,
   messageComponents,
+  ssbSideband,
   collapsed,
   onCarrierAmplitudeChange,
   onCarrierFrequencyChange,
@@ -659,6 +704,7 @@ export default function InspectorPanel({
   onUpdateMessageComponent,
   onRemoveMessageComponent,
   onModulationIndexChange,
+  onSsbSidebandChange,
   onPlotSignalVisibilityChange,
   onPlotSignalXScaleChange,
   onPlotSignalYScaleChange,
@@ -675,6 +721,7 @@ export default function InspectorPanel({
   onToggleCollapsed,
 }: InspectorPanelProps) {
   const supportsModulationIndex = activeAmplitudeScheme === "DSB-LC";
+  const isSsbMode = activeAmplitudeScheme === "SSB";
 
   if (collapsed) {
     return (
@@ -731,13 +778,13 @@ export default function InspectorPanel({
 
         <CollapsibleSection title="Message Settings">
           <MessageExpressionSummary messageComponents={messageComponents} />
-          <div className="flex gap-2">
+          <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
               onClick={() => {
                 onAddMessageComponent("sine");
               }}
-              className="flex-1 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
             >
               Add Sine
             </button>
@@ -746,12 +793,12 @@ export default function InspectorPanel({
               onClick={() => {
                 onAddMessageComponent("cosine");
               }}
-              className="flex-1 rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
             >
               Add Cosine
             </button>
           </div>
-          <div className="space-y-3">
+          <div className="space-y-2">
             {messageComponents.map((component) => (
               <MessageComponentEditor
                 key={component.id}
@@ -769,12 +816,20 @@ export default function InspectorPanel({
             title={
               supportsModulationIndex
                 ? "Large-carrier AM equation"
+                : isSsbMode
+                  ? `${ssbSideband} equation`
                 : "Suppressed-carrier equation"
             }
             leftSide={
               supportsModulationIndex ? (
                 <>
                   <span className="italic">u</span>
+                  <span>(t)</span>
+                </>
+              ) : isSsbMode ? (
+                <>
+                  <span className="italic">u</span>
+                  <sub>SSB</sub>
                   <span>(t)</span>
                 </>
               ) : (
@@ -804,6 +859,30 @@ export default function InspectorPanel({
                       <span>t)</span>
                     </>
                   )
+                : isSsbMode ? (
+                    <>
+                      <span className="italic">A</span>
+                      <sub>c</sub>
+                      <span>[</span>
+                      <span className="italic">m</span>
+                      <span>(t)</span>
+                      <span> </span>
+                      <span className="italic">cos</span>
+                      <span>(2Ï€</span>
+                      <span className="italic">f</span>
+                      <sub>c</sub>
+                      <span>t) </span>
+                      <span>{ssbSideband === "USB" ? "-" : "+"}</span>
+                      <span> </span>
+                      <span className="italic">m̂</span>
+                      <span>(t) </span>
+                      <span className="italic">sin</span>
+                      <span>(2Ï€</span>
+                      <span className="italic">f</span>
+                      <sub>c</sub>
+                      <span>t)]</span>
+                    </>
+                  )
                 : (
                     <>
                       <span className="italic">A</span>
@@ -821,6 +900,40 @@ export default function InspectorPanel({
                   )
             }
           />
+          {isSsbMode ? (
+            <div className="space-y-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-[color:var(--ui-text-muted)]">
+                  Sideband Selection
+                </span>
+                <span className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
+                  {ssbSideband}
+                </span>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                {(["USB", "LSB"] as const).map((sideband) => (
+                  <button
+                    key={sideband}
+                    type="button"
+                    onClick={() => {
+                      onSsbSidebandChange(sideband);
+                    }}
+                    className={[
+                      "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+                      ssbSideband === sideband
+                        ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+                        : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+                    ].join(" ")}
+                  >
+                    {sideband}
+                  </button>
+                ))}
+              </div>
+              <div className="text-xs text-[color:var(--ui-text-muted)]">
+                Uses the Hilbert-transform quadrature path in the DSP layer.
+              </div>
+            </div>
+          ) : null}
           {supportsModulationIndex ? (
             <RangeField
               title="Modulation Index"
