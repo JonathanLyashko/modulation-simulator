@@ -7,6 +7,7 @@ import {
   createDspClient,
   generateDsbScBundle,
   generateDsbLcBundle,
+  generateFmBundle,
   generateSsbBundle,
   readSignalSnapshot,
 } from "@/app/lib/dspClient";
@@ -150,10 +151,27 @@ export default function SignalWorkspace() {
     (currentMaximum, component) => Math.max(currentMaximum, component.frequency),
     0
   );
-  const highestRepresentedFrequency = Math.max(
-    highestMessageFrequency,
-    settings.carrier.frequency + highestMessageFrequency
+  const messagePeakUpperBound = settings.messageComponents.reduce(
+    (total, component) => total + Math.abs(component.amplitude),
+    0
   );
+  const fmDeviationHz = settings.frequencySensitivity * messagePeakUpperBound;
+  const activeModulationLabel =
+    activeModulationFamily === "amplitude" ? activeAmplitudeScheme : activeAngleScheme;
+  const supportsCurrentModulation =
+    activeModulationFamily === "amplitude"
+      ? SUPPORTED_AMPLITUDE_SCHEMES.includes(activeAmplitudeScheme)
+      : activeAngleScheme === "FM";
+  const highestRepresentedFrequency =
+    activeModulationFamily === "angle" && activeAngleScheme === "FM"
+      ? Math.max(
+          highestMessageFrequency,
+          settings.carrier.frequency + fmDeviationHz + highestMessageFrequency
+        )
+      : Math.max(
+          highestMessageFrequency,
+          settings.carrier.frequency + highestMessageFrequency
+        );
   const nyquistMinimumSampleRate = Math.ceil(
     highestRepresentedFrequency * NYQUIST_MULTIPLIER
   );
@@ -186,9 +204,32 @@ export default function SignalWorkspace() {
     spanHz: boundedFrequencySpan,
     centerHz: boundedFrequencyCenter,
   };
+  const displayedSignals = supportsCurrentModulation
+    ? signalByView
+    : {
+        message: null,
+        carrier: null,
+        modulated: null,
+      };
+  const displayedSpectra = supportsCurrentModulation
+    ? spectrumByView
+    : {
+        message: null,
+        carrier: null,
+        modulated: null,
+      };
 
   useEffect(() => {
-    if (!SUPPORTED_AMPLITUDE_SCHEMES.includes(activeAmplitudeScheme)) {
+    if (!supportsCurrentModulation) {
+      const previousIds = [...activeSignalIdsRef.current];
+      activeSignalIdsRef.current = [];
+      if (previousIds.length > 0) {
+        void createDspClient().then((dsp) => {
+          for (const signalId of previousIds) {
+            dsp.destroySignal(signalId);
+          }
+        });
+      }
       return;
     }
 
@@ -206,17 +247,22 @@ export default function SignalWorkspace() {
           carrierPhase: settings.carrier.phase,
         };
         const bundle =
-          activeAmplitudeScheme === "DSB-SC"
-            ? await generateDsbScBundle(sharedOptions)
-            : activeAmplitudeScheme === "SSB"
-              ? await generateSsbBundle({
-                  ...sharedOptions,
-                  sideband: ssbSideband,
-                })
-              : await generateDsbLcBundle({
+          activeModulationFamily === "angle"
+            ? await generateFmBundle({
                 ...sharedOptions,
-                modulationIndex: settings.modulationIndex,
-              });
+                frequencySensitivity: settings.frequencySensitivity,
+              })
+            : activeAmplitudeScheme === "DSB-SC"
+              ? await generateDsbScBundle(sharedOptions)
+              : activeAmplitudeScheme === "SSB"
+                ? await generateSsbBundle({
+                    ...sharedOptions,
+                    sideband: ssbSideband,
+                  })
+                : await generateDsbLcBundle({
+                    ...sharedOptions,
+                    modulationIndex: settings.modulationIndex,
+                  });
 
         if (disposed) {
           dsp.destroySignal(bundle.message.signalId);
@@ -309,10 +355,13 @@ export default function SignalWorkspace() {
     };
   }, [
     activeAmplitudeScheme,
+    activeAngleScheme,
+    activeModulationFamily,
     frequencyPlotSettings.fftSize,
     sampleCount,
     sampleRate,
     settings,
+    supportsCurrentModulation,
     ssbSideband,
   ]);
 
@@ -334,7 +383,7 @@ export default function SignalWorkspace() {
     };
   }, []);
 
-  const selectedSignal = signalByView[selectedSignalView];
+  const selectedSignal = displayedSignals[selectedSignalView];
   const selectedSignalLabel =
     selectedSignalView === "message"
       ? "MESSAGE WAVEFORM"
@@ -505,14 +554,14 @@ export default function SignalWorkspace() {
 
           <main className="flex min-w-0 flex-1 flex-col bg-[color:var(--ui-surface)]">
             <BlockCanvas
-              activeModulation={activeAmplitudeScheme}
+              activeModulation={activeModulationLabel}
               settings={settings}
               selectedSignalView={selectedSignalView}
               onSelectSignalView={setSelectedSignalView}
             />
             <BottomPanels
-              signals={signalByView}
-              spectra={spectrumByView}
+              signals={displayedSignals}
+              spectra={displayedSpectra}
               selectedSignalView={selectedSignalView}
               plotSettings={plotSettings}
               frequencyPlotSettings={boundedFrequencyPlotSettings}
@@ -522,7 +571,10 @@ export default function SignalWorkspace() {
           </main>
 
           <InspectorPanel
+            activeModulationFamily={activeModulationFamily}
             activeAmplitudeScheme={activeAmplitudeScheme}
+            activeAngleScheme={activeAngleScheme}
+            activeModulationLabel={activeModulationLabel}
             settings={settings}
             plotSettings={plotSettings}
             frequencyPlotSettings={boundedFrequencyPlotSettings}
@@ -625,6 +677,14 @@ export default function SignalWorkspace() {
                 setSettings((current) => ({
                   ...current,
                   modulationIndex: Math.max(0, Math.min(1.5, value)),
+                }));
+              }
+            }}
+            onFrequencySensitivityChange={(value) => {
+              if (Number.isFinite(value)) {
+                setSettings((current) => ({
+                  ...current,
+                  frequencySensitivity: Math.max(0, Math.min(5000, value)),
                 }));
               }
             }}

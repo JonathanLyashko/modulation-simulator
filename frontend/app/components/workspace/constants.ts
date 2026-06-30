@@ -34,6 +34,7 @@ export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
     phase: 0,
   },
   modulationIndex: 0.8,
+  frequencySensitivity: 250,
 };
 
 export const DEFAULT_PLOT_SETTINGS: PlotSettings = {

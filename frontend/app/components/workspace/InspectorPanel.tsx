@@ -5,6 +5,7 @@ import type { ReactNode } from "react";
 
 import { FFT_SIZE_OPTIONS } from "./constants";
 import type {
+  AnalogAngleScheme,
   AnalogAmplitudeScheme,
   FrequencyPlotSettings,
   MessageComponent,
@@ -18,7 +19,10 @@ import type {
 } from "./types";
 
 type InspectorPanelProps = {
+  activeModulationFamily: "amplitude" | "angle";
   activeAmplitudeScheme: AnalogAmplitudeScheme;
+  activeAngleScheme: AnalogAngleScheme;
+  activeModulationLabel: string;
   settings: ModulatorSettings;
   plotSettings: PlotSettings;
   frequencyPlotSettings: FrequencyPlotSettings;
@@ -41,6 +45,7 @@ type InspectorPanelProps = {
   ) => void;
   onRemoveMessageComponent: (componentId: string) => void;
   onModulationIndexChange: (value: number) => void;
+  onFrequencySensitivityChange: (value: number) => void;
   onSsbSidebandChange: (sideband: SsbSideband) => void;
   onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
   onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
@@ -452,6 +457,34 @@ function SsbExpression({
   );
 }
 
+function FmExpression() {
+  return (
+    <>
+      <span className="italic">A</span>
+      <sub>c</sub>
+      <span className="italic">cos</span>
+      <span>[2</span>
+      <PiSymbol />
+      <span className="italic">f</span>
+      <sub>c</sub>
+      <span>t + 2</span>
+      <PiSymbol />
+      <span className="italic">k</span>
+      <sub>f</sub>
+      <span> ∫</span>
+      <sub>0</sub>
+      <sup>t</sup>
+      <span> </span>
+      <span className="italic">m</span>
+      <span>(tau)d</span>
+      <span className="italic">tau</span>
+      <span> + phi</span>
+      <sub>0</sub>
+      <span>]</span>
+    </>
+  );
+}
+
 function AmplitudeGauge({
   amplitude,
   onChange,
@@ -730,7 +763,10 @@ function PlotSignalSettingsSection({
 }
 
 export default function InspectorPanel({
+  activeModulationFamily,
   activeAmplitudeScheme,
+  activeAngleScheme,
+  activeModulationLabel,
   settings,
   plotSettings,
   frequencyPlotSettings,
@@ -749,6 +785,7 @@ export default function InspectorPanel({
   onUpdateMessageComponent,
   onRemoveMessageComponent,
   onModulationIndexChange,
+  onFrequencySensitivityChange,
   onSsbSidebandChange,
   onPlotSignalVisibilityChange,
   onPlotSignalXScaleChange,
@@ -767,6 +804,8 @@ export default function InspectorPanel({
 }: InspectorPanelProps) {
   const supportsModulationIndex = activeAmplitudeScheme === "DSB-LC";
   const isSsbMode = activeAmplitudeScheme === "SSB";
+  const isFmMode =
+    activeModulationFamily === "angle" && activeAngleScheme === "FM";
 
   if (collapsed) {
     return (
@@ -796,7 +835,7 @@ export default function InspectorPanel({
     <aside className="flex w-[320px] shrink-0 flex-col border-l border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-low)]">
       <div className="flex items-center justify-between border-b border-[color:var(--ui-outline-variant)] p-4">
         <h2 className="text-sm font-semibold uppercase tracking-tight">
-          {activeAmplitudeScheme} Parameters
+          {activeModulationLabel} Parameters
         </h2>
         <button
           type="button"
@@ -857,6 +896,30 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
+          {isFmMode ? (
+            <>
+              <ModulationEquationCard
+                title="FM equation"
+                leftSide={
+                  <>
+                    <span className="italic">u</span>
+                    <sub>FM</sub>
+                    <span>(t)</span>
+                  </>
+                }
+                expression={<FmExpression />}
+              />
+              <RangeField
+                title="Frequency Sensitivity"
+                valueLabel={`k_f = ${settings.frequencySensitivity.toFixed(0)} Hz/unit`}
+                min={0}
+                max={5000}
+                step={10}
+                value={settings.frequencySensitivity}
+                onChange={onFrequencySensitivityChange}
+              />
+            </>
+          ) : null}
           {isSsbMode ? (
             <ModulationEquationCard
               title={`${ssbSideband} equation`}
@@ -870,7 +933,7 @@ export default function InspectorPanel({
               expression={<SsbExpression sideband={ssbSideband} />}
             />
           ) : null}
-          {!isSsbMode ? (
+          {!isSsbMode && !isFmMode ? (
             <ModulationEquationCard
             title={
               supportsModulationIndex

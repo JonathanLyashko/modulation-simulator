@@ -18,6 +18,7 @@ export type ModulatorSettings = {
   messageComponents: MessageComponent[];
   carrier: OscillatorSettings;
   modulationIndex: number;
+  frequencySensitivity: number;
 };
 
 export type PlotSignalSettings = {
