@@ -81,6 +81,8 @@ function drawSpectrum(
   const stride = Math.max(1, Math.ceil(visibleSampleCount / MAX_RENDER_POINTS));
   const renderedPointCount = Math.ceil(visibleSampleCount / stride);
   const verticalRange = Math.max(yScale * GRID_DIVISIONS, 1e-6);
+  const renderDiscreteBins = renderedPointCount <= 160;
+  const points: Array<{ x: number; y: number }> = [];
 
   let peakDb = -120;
   if (mode === "db") {
@@ -91,7 +93,8 @@ function drawSpectrum(
 
   for (let pointIndex = 0; pointIndex < renderedPointCount; pointIndex += 1) {
     const sampleIndex = Math.min(minIndex + pointIndex * stride, maxIndex);
-    const x = (pointIndex / Math.max(renderedPointCount - 1, 1)) * width;
+    const frequency = sampleIndex * frequencyPerSample - sampleRate / 2;
+    const x = ((frequency - minFrequency) / spanHz) * width;
 
     let y = height;
     if (mode === "magnitude") {
@@ -103,6 +106,8 @@ function drawSpectrum(
       y = Math.min((relativeDb / verticalRange) * height, height);
     }
 
+    points.push({ x, y });
+
     if (pointIndex === 0) {
       context.moveTo(x, y);
     } else {
@@ -111,6 +116,26 @@ function drawSpectrum(
   }
 
   context.stroke();
+
+  if (renderDiscreteBins) {
+    context.save();
+    context.strokeStyle = strokeStyle;
+    context.fillStyle = strokeStyle;
+    context.lineWidth = Math.max(1, lineWidth * 0.75);
+
+    for (const point of points) {
+      context.beginPath();
+      context.moveTo(point.x, height);
+      context.lineTo(point.x, point.y);
+      context.stroke();
+
+      context.beginPath();
+      context.arc(point.x, point.y, 2.2, 0, Math.PI * 2);
+      context.fill();
+    }
+
+    context.restore();
+  }
 }
 
 function formatSpan(spanHz: number) {
@@ -144,6 +169,10 @@ function formatScaleLabel(yScale: number, mode: SpectrumDisplayMode) {
     : `${yScale.toFixed(1)} dB/div`;
 }
 
+function formatResolutionLabel(sampleRate: number, fftSize: number) {
+  return `RBW: ${(sampleRate / fftSize).toFixed(2)} Hz`;
+}
+
 function getSignalLabel(view: SignalView) {
   if (view === "message") {
     return "Message";
@@ -164,6 +193,12 @@ export default function FrequencySpectrumPanel({
   spectrumDisplayMode,
 }: FrequencySpectrumPanelProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const referenceSampleRate =
+    spectra[selectedSignalView]?.sampleRate ??
+    spectra.modulated?.sampleRate ??
+    spectra.carrier?.sampleRate ??
+    spectra.message?.sampleRate ??
+    48_000;
 
   const visibleSpectra = useMemo(() => {
     return SIGNAL_ORDER.map((view) => ({
@@ -259,6 +294,12 @@ export default function FrequencySpectrumPanel({
           <span>{formatSpan(frequencyPlotSettings.spanHz)}</span>
           <span>{formatCenter(frequencyPlotSettings.centerHz)}</span>
           <span>{formatFrequencyPerDivision(frequencyPlotSettings.spanHz)}</span>
+          <span>
+            {formatResolutionLabel(
+              referenceSampleRate,
+              frequencyPlotSettings.fftSize
+            )}
+          </span>
           <span>{formatScaleLabel(frequencyPlotSettings.yScale, spectrumDisplayMode)}</span>
         </div>
       </div>

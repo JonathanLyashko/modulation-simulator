@@ -13,6 +13,7 @@ import {
 import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
 import {
+  DEFAULT_FFT_SIZE,
   DEFAULT_FREQUENCY_PLOT_SETTINGS,
   DEFAULT_MESSAGE_COMPONENTS,
   DEFAULT_MODULATOR_SETTINGS,
@@ -77,6 +78,7 @@ function createDefaultFrequencyPlotSettings(
     centerHz: 0,
     spanHz: recommendedSpan,
     yScale: DEFAULT_FREQUENCY_PLOT_SETTINGS.yScale,
+    fftSize: DEFAULT_FFT_SIZE,
   };
 }
 
@@ -156,8 +158,28 @@ export default function SignalWorkspace() {
   );
   const sampleCount = Math.max(
     1024,
+    frequencyPlotSettings.fftSize,
     Math.ceil(sampleRate * requestedWindowSeconds)
   );
+  const fftResolutionHz = sampleRate / frequencyPlotSettings.fftSize;
+  const minimumFrequencySpan = Math.max(fftResolutionHz * 4, 20);
+  const boundedFrequencySpan = Math.max(
+    minimumFrequencySpan,
+    Math.min(sampleRate, frequencyPlotSettings.spanHz)
+  );
+  const maximumFrequencyCenter = Math.max(
+    sampleRate / 2 - boundedFrequencySpan / 2,
+    0
+  );
+  const boundedFrequencyCenter = Math.max(
+    -maximumFrequencyCenter,
+    Math.min(maximumFrequencyCenter, frequencyPlotSettings.centerHz)
+  );
+  const boundedFrequencyPlotSettings: FrequencyPlotSettings = {
+    ...frequencyPlotSettings,
+    spanHz: boundedFrequencySpan,
+    centerHz: boundedFrequencyCenter,
+  };
 
   useEffect(() => {
     if (!SUPPORTED_AMPLITUDE_SCHEMES.includes(activeAmplitudeScheme)) {
@@ -192,9 +214,18 @@ export default function SignalWorkspace() {
           return;
         }
 
-        const messageSpectrumId = dsp.fftMagnitudeSpectrum(bundle.message.signalId);
-        const carrierSpectrumId = dsp.fftMagnitudeSpectrum(bundle.carrier.signalId);
-        const modulatedSpectrumId = dsp.fftMagnitudeSpectrum(bundle.modulated.signalId);
+        const messageSpectrumId = dsp.fftMagnitudeSpectrumSized(
+          bundle.message.signalId,
+          frequencyPlotSettings.fftSize
+        );
+        const carrierSpectrumId = dsp.fftMagnitudeSpectrumSized(
+          bundle.carrier.signalId,
+          frequencyPlotSettings.fftSize
+        );
+        const modulatedSpectrumId = dsp.fftMagnitudeSpectrumSized(
+          bundle.modulated.signalId,
+          frequencyPlotSettings.fftSize
+        );
 
         if (
           messageSpectrumId < 0 ||
@@ -265,7 +296,7 @@ export default function SignalWorkspace() {
     return () => {
       disposed = true;
     };
-  }, [activeAmplitudeScheme, sampleCount, sampleRate, settings]);
+  }, [activeAmplitudeScheme, frequencyPlotSettings.fftSize, sampleCount, sampleRate, settings]);
 
   useEffect(() => {
     return () => {
@@ -461,7 +492,7 @@ export default function SignalWorkspace() {
               spectra={spectrumByView}
               selectedSignalView={selectedSignalView}
               plotSettings={plotSettings}
-              frequencyPlotSettings={frequencyPlotSettings}
+              frequencyPlotSettings={boundedFrequencyPlotSettings}
               playbackCursorSeconds={playbackCursorSeconds}
               spectrumDisplayMode={spectrumDisplayMode}
             />
@@ -471,7 +502,9 @@ export default function SignalWorkspace() {
             activeAmplitudeScheme={activeAmplitudeScheme}
             settings={settings}
             plotSettings={plotSettings}
-            frequencyPlotSettings={frequencyPlotSettings}
+            frequencyPlotSettings={boundedFrequencyPlotSettings}
+            fftResolutionHz={fftResolutionHz}
+            sampleRate={sampleRate}
             selectedSignalLabel={selectedSignalLabel}
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
@@ -611,7 +644,7 @@ export default function SignalWorkspace() {
                 return;
               }
 
-              const halfSpan = frequencyPlotSettings.spanHz / 2;
+              const halfSpan = boundedFrequencyPlotSettings.spanHz / 2;
               const maxCenter = Math.max(sampleRate / 2 - halfSpan, 0);
               setFrequencyPlotSettings((current) => ({
                 ...current,
@@ -623,11 +656,30 @@ export default function SignalWorkspace() {
                 return;
               }
 
-              const boundedSpan = Math.max(100, Math.min(sampleRate, value));
+              const boundedSpan = Math.max(minimumFrequencySpan, Math.min(sampleRate, value));
               setFrequencyPlotSettings((current) => {
                 const maxCenter = Math.max(sampleRate / 2 - boundedSpan / 2, 0);
                 return {
                   ...current,
+                  spanHz: boundedSpan,
+                  centerHz: Math.max(-maxCenter, Math.min(maxCenter, current.centerHz)),
+                };
+              });
+            }}
+            onFrequencyPlotFftSizeChange={(value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              setFrequencyPlotSettings((current) => {
+                const nextResolutionHz = sampleRate / value;
+                const minimumSpan = Math.max(nextResolutionHz * 4, 20);
+                const boundedSpan = Math.max(current.spanHz, minimumSpan);
+                const maxCenter = Math.max(sampleRate / 2 - boundedSpan / 2, 0);
+
+                return {
+                  ...current,
+                  fftSize: value,
                   spanHz: boundedSpan,
                   centerHz: Math.max(-maxCenter, Math.min(maxCenter, current.centerHz)),
                 };

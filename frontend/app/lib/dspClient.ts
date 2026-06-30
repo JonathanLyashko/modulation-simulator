@@ -18,6 +18,7 @@ type DspExports = {
   getSignalSampleRate(signalId: number): number;
   getSignalSample(signalId: number, sampleIndex: number): number;
   fftMagnitudeSpectrum(signalId: number): number;
+  fftMagnitudeSpectrumSized(signalId: number, fftSize: number): number;
   clearSignal(signalId: number): void;
   addSineComponent(
     signalId: number,
@@ -108,6 +109,11 @@ export async function createDspClient(): Promise<DspExports> {
     fftMagnitudeSpectrum: wasmModule.cwrap("dsp_fft_magnitude_spectrum", "number", [
       "number",
     ]),
+    fftMagnitudeSpectrumSized: wasmModule.cwrap(
+      "dsp_fft_magnitude_spectrum_sized",
+      "number",
+      ["number", "number"]
+    ),
     clearSignal: wasmModule.cwrap("dsp_clear_signal", null, ["number"]),
     addSineComponent: wasmModule.cwrap("dsp_add_sine_component", null, [
       "number",

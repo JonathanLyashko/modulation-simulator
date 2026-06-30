@@ -33,6 +33,10 @@ int dsp_fft_magnitude_spectrum(int signal_id) {
     return fftMagnitudeSpectrum(signal_id);
 }
 
+int dsp_fft_magnitude_spectrum_sized(int signal_id, int fft_size) {
+    return fftMagnitudeSpectrum(signal_id, fft_size);
+}
+
 void dsp_clear_signal(int signal_id) {
     zeroSignalSamples(signal_id);
 }

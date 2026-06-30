@@ -13,6 +13,8 @@ export const NYQUIST_MULTIPLIER = 2;
 export const SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE = 32;
 export const DEFAULT_X_SCALE_SECONDS_PER_DIVISION = DISPLAY_WINDOW_SECONDS / 10;
 export const DEFAULT_Y_SCALE_VOLTS_PER_DIVISION = 0.5;
+export const FFT_SIZE_OPTIONS = [1024, 2048, 4096, 8192, 16384] as const;
+export const DEFAULT_FFT_SIZE = 8192;
 
 export const DEFAULT_MESSAGE_COMPONENTS: MessageComponent[] = [
   {
@@ -56,4 +58,5 @@ export const DEFAULT_FREQUENCY_PLOT_SETTINGS: FrequencyPlotSettings = {
   centerHz: 0,
   spanHz: 2_500,
   yScale: 0.2,
+  fftSize: DEFAULT_FFT_SIZE,
 };

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { ReactNode } from "react";
 
+import { FFT_SIZE_OPTIONS } from "./constants";
 import type {
   AnalogAmplitudeScheme,
   FrequencyPlotSettings,
@@ -20,6 +21,8 @@ type InspectorPanelProps = {
   settings: ModulatorSettings;
   plotSettings: PlotSettings;
   frequencyPlotSettings: FrequencyPlotSettings;
+  sampleRate: number;
+  fftResolutionHz: number;
   selectedSignalLabel: string;
   isAudioPlaying: boolean;
   audioStatus: string;
@@ -41,6 +44,7 @@ type InspectorPanelProps = {
   onPlotSignalYScaleChange: (view: SignalView, value: number) => void;
   onFrequencyPlotCenterChange: (value: number) => void;
   onFrequencyPlotSpanChange: (value: number) => void;
+  onFrequencyPlotFftSizeChange: (value: number) => void;
   onFrequencyPlotYScaleChange: (value: number) => void;
   spectrumDisplayMode: SpectrumDisplayMode;
   onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
@@ -104,25 +108,78 @@ function RangeField({
 
 function FrequencyPlotSettingsSection({
   frequencyPlotSettings,
+  sampleRate,
+  fftResolutionHz,
   spectrumDisplayMode,
   onCenterChange,
   onSpanChange,
+  onFftSizeChange,
   onYScaleChange,
   onSpectrumDisplayModeChange,
 }: {
   frequencyPlotSettings: FrequencyPlotSettings;
+  sampleRate: number;
+  fftResolutionHz: number;
   spectrumDisplayMode: SpectrumDisplayMode;
   onCenterChange: (value: number) => void;
   onSpanChange: (value: number) => void;
+  onFftSizeChange: (value: number) => void;
   onYScaleChange: (value: number) => void;
   onSpectrumDisplayModeChange: (mode: SpectrumDisplayMode) => void;
 }) {
   const frequencyPerDivision = frequencyPlotSettings.spanHz / 10;
+  const nyquistHz = sampleRate / 2;
+  const minimumSpan = Math.max(fftResolutionHz * 4, 20);
 
   return (
     <div className="space-y-4 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
       <div className="text-sm font-medium text-[color:var(--ui-text)]">
         FFT Display
+      </div>
+      <div className="grid grid-cols-2 gap-3 rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] p-3 text-xs text-[color:var(--ui-text-muted)]">
+        <div>
+          <div className="font-semibold uppercase tracking-[0.14em] text-[color:var(--ui-outline)]">
+            Resolution
+          </div>
+          <div className="mt-1 font-mono text-sm text-[color:var(--ui-text)]">
+            {fftResolutionHz.toFixed(2)} Hz/bin
+          </div>
+        </div>
+        <div>
+          <div className="font-semibold uppercase tracking-[0.14em] text-[color:var(--ui-outline)]">
+            Two-Sided Range
+          </div>
+          <div className="mt-1 font-mono text-sm text-[color:var(--ui-text)]">
+            ±{nyquistHz.toFixed(0)} Hz
+          </div>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <div className="flex items-center justify-between">
+          <span className="text-sm text-[color:var(--ui-text-muted)]">FFT Size</span>
+          <span className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-2 py-0.5 font-mono text-sm">
+            {frequencyPlotSettings.fftSize}
+          </span>
+        </div>
+        <div className="grid grid-cols-3 gap-2">
+          {FFT_SIZE_OPTIONS.map((fftSize) => (
+            <button
+              key={fftSize}
+              type="button"
+              onClick={() => {
+                onFftSizeChange(fftSize);
+              }}
+              className={[
+                "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors",
+                frequencyPlotSettings.fftSize === fftSize
+                  ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+                  : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+              ].join(" ")}
+            >
+              {fftSize}
+            </button>
+          ))}
+        </div>
       </div>
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -157,27 +214,27 @@ function FrequencyPlotSettingsSection({
       <RangeField
         title="Span"
         valueLabel={`${frequencyPlotSettings.spanHz.toFixed(0)} Hz`}
-        min={100}
-        max={20000}
-        step={50}
+        min={minimumSpan}
+        max={sampleRate}
+        step={Math.max(fftResolutionHz, 1)}
         value={frequencyPlotSettings.spanHz}
         onChange={onSpanChange}
       />
       <RangeField
         title="Center"
         valueLabel={`${frequencyPlotSettings.centerHz.toFixed(0)} Hz`}
-        min={-20000}
-        max={20000}
-        step={50}
+        min={-nyquistHz}
+        max={nyquistHz}
+        step={Math.max(fftResolutionHz, 1)}
         value={frequencyPlotSettings.centerHz}
         onChange={onCenterChange}
       />
       <RangeField
         title="Frequency / Div"
         valueLabel={`${frequencyPerDivision.toFixed(0)} Hz/div`}
-        min={10}
-        max={2000}
-        step={5}
+        min={minimumSpan / 10}
+        max={sampleRate / 10}
+        step={Math.max(fftResolutionHz / 10, 1)}
         value={frequencyPerDivision}
         onChange={(value) => {
           onSpanChange(value * 10);
@@ -279,6 +336,29 @@ function MessageExpressionSummary({
           </div>
         </>
       )}
+    </div>
+  );
+}
+
+function ModulationEquationCard({
+  title,
+  leftSide,
+  expression,
+}: {
+  title: string;
+  leftSide: ReactNode;
+  expression: ReactNode;
+}) {
+  return (
+    <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white px-4 py-4">
+      <div className="text-sm font-medium text-[color:var(--ui-text)]">{title}</div>
+      <div className="mt-3 overflow-x-auto">
+        <div className="min-w-fit font-serif text-[1.05rem] leading-8 text-[color:var(--ui-text)]">
+          <span>{leftSide}</span>
+          <span> = </span>
+          <span>{expression}</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -565,6 +645,8 @@ export default function InspectorPanel({
   settings,
   plotSettings,
   frequencyPlotSettings,
+  sampleRate,
+  fftResolutionHz,
   selectedSignalLabel,
   isAudioPlaying,
   audioStatus,
@@ -582,6 +664,7 @@ export default function InspectorPanel({
   onPlotSignalYScaleChange,
   onFrequencyPlotCenterChange,
   onFrequencyPlotSpanChange,
+  onFrequencyPlotFftSizeChange,
   onFrequencyPlotYScaleChange,
   spectrumDisplayMode,
   onSpectrumDisplayModeChange,
@@ -682,6 +765,62 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
+          <ModulationEquationCard
+            title={
+              supportsModulationIndex
+                ? "Large-carrier AM equation"
+                : "Suppressed-carrier equation"
+            }
+            leftSide={
+              supportsModulationIndex ? (
+                <>
+                  <span className="italic">u</span>
+                  <span>(t)</span>
+                </>
+              ) : (
+                <>
+                  <span className="italic">u</span>
+                  <sub>DSB-SC</sub>
+                  <span>(t)</span>
+                </>
+              )
+            }
+            expression={
+              supportsModulationIndex
+                ? (
+                    <>
+                      <span className="italic">A</span>
+                      <sub>c</sub>
+                      <span>[1 + </span>
+                      <span className="italic">a</span>
+                      <span> </span>
+                      <span className="italic">m</span>
+                      <sub>n</sub>
+                      <span>(t)] </span>
+                      <span className="italic">cos</span>
+                      <span>(2π</span>
+                      <span className="italic">f</span>
+                      <sub>c</sub>
+                      <span>t)</span>
+                    </>
+                  )
+                : (
+                    <>
+                      <span className="italic">A</span>
+                      <sub>c</sub>
+                      <span> </span>
+                      <span className="italic">m</span>
+                      <span>(t)</span>
+                      <span> </span>
+                      <span className="italic">cos</span>
+                      <span>(2π</span>
+                      <span className="italic">f</span>
+                      <sub>c</sub>
+                      <span>t)</span>
+                    </>
+                  )
+            }
+          />
           {supportsModulationIndex ? (
             <RangeField
               title="Modulation Index"
@@ -692,16 +831,7 @@ export default function InspectorPanel({
               value={settings.modulationIndex}
               onChange={onModulationIndexChange}
             />
-          ) : (
-            <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-3 text-sm leading-6 text-[color:var(--ui-text-muted)]">
-              <div className="font-medium text-[color:var(--ui-text)]">
-                Suppressed carrier mode
-              </div>
-              <div className="mt-2 font-mono text-xs text-[color:var(--ui-outline)]">
-                u_DSB-SC(t) = A_c m(t) cos(2pi f_c t)
-              </div>
-            </div>
-          )}
+          ) : null}
           <button
             type="button"
             onClick={onResetSignals}
@@ -754,9 +884,12 @@ export default function InspectorPanel({
         <CollapsibleSection title="Frequency Plot Settings">
           <FrequencyPlotSettingsSection
             frequencyPlotSettings={frequencyPlotSettings}
+            sampleRate={sampleRate}
+            fftResolutionHz={fftResolutionHz}
             spectrumDisplayMode={spectrumDisplayMode}
             onCenterChange={onFrequencyPlotCenterChange}
             onSpanChange={onFrequencyPlotSpanChange}
+            onFftSizeChange={onFrequencyPlotFftSizeChange}
             onYScaleChange={onFrequencyPlotYScaleChange}
             onSpectrumDisplayModeChange={onSpectrumDisplayModeChange}
           />

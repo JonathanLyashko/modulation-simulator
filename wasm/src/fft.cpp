@@ -2,6 +2,7 @@
 
 #include "signal.hpp"
 
+#include <algorithm>
 #include <cmath>
 #include <complex>
 #include <vector>
@@ -53,26 +54,32 @@ void fftInPlace(std::vector<std::complex<float>>& samples) {
 }
 }  // namespace
 
-int fftMagnitudeSpectrum(int signalId) {
+int fftMagnitudeSpectrum(int signalId, int requestedFftSize) {
     Signal* signal = getSignal(signalId);
     if (signal == nullptr || signal->samples.empty() || signal->sampleRate <= 0) {
         return -1;
     }
 
     const std::size_t inputLength = signal->samples.size();
-    const std::size_t fftLength = nextPowerOfTwo(inputLength);
+    const std::size_t minimumLength = std::min<std::size_t>(
+        inputLength,
+        static_cast<std::size_t>(
+            requestedFftSize > 0 ? requestedFftSize : static_cast<int>(inputLength)
+        )
+    );
+    const std::size_t fftLength = nextPowerOfTwo(std::max<std::size_t>(minimumLength, 1));
     std::vector<std::complex<float>> fftSamples(fftLength, std::complex<float>(0.0f, 0.0f));
 
     float windowSum = 0.0f;
-    if (inputLength == 1) {
+    if (minimumLength == 1) {
         fftSamples[0] = std::complex<float>(signal->samples[0], 0.0f);
         windowSum = 1.0f;
     } else {
-        for (std::size_t index = 0; index < inputLength; ++index) {
+        for (std::size_t index = 0; index < minimumLength; ++index) {
             const float window =
                 0.5f - 0.5f * std::cos(
                     2.0f * kPi * static_cast<float>(index) /
-                    static_cast<float>(inputLength - 1)
+                    static_cast<float>(minimumLength - 1)
                 );
             fftSamples[index] = std::complex<float>(signal->samples[index] * window, 0.0f);
             windowSum += window;
@@ -97,4 +104,8 @@ int fftMagnitudeSpectrum(int signalId) {
     }
 
     return spectrumSignalId;
+}
+
+int fftMagnitudeSpectrum(int signalId) {
+    return fftMagnitudeSpectrum(signalId, 0);
 }

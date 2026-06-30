@@ -32,6 +32,7 @@ export type FrequencyPlotSettings = {
   centerHz: number;
   spanHz: number;
   yScale: number;
+  fftSize: number;
 };
 
 export type SignalSnapshot = {
