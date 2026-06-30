@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import type {
+  AnalogAmplitudeScheme,
   FrequencyPlotSettings,
   MessageComponent,
   MessageComponentType,
@@ -15,6 +16,7 @@ import type {
 } from "./types";
 
 type InspectorPanelProps = {
+  activeAmplitudeScheme: AnalogAmplitudeScheme;
   settings: ModulatorSettings;
   plotSettings: PlotSettings;
   frequencyPlotSettings: FrequencyPlotSettings;
@@ -22,6 +24,7 @@ type InspectorPanelProps = {
   isAudioPlaying: boolean;
   audioStatus: string;
   messageComponents: MessageComponent[];
+  collapsed: boolean;
   onCarrierAmplitudeChange: (value: number) => void;
   onCarrierFrequencyChange: (value: number) => void;
   onCarrierPhaseChange: (value: number) => void;
@@ -45,6 +48,7 @@ type InspectorPanelProps = {
   onResetPlot: () => void;
   onPlayAudio: () => void;
   onStopAudio: () => void;
+  onToggleCollapsed: () => void;
 };
 
 function RangeField({
@@ -557,6 +561,7 @@ function PlotSignalSettingsSection({
 }
 
 export default function InspectorPanel({
+  activeAmplitudeScheme,
   settings,
   plotSettings,
   frequencyPlotSettings,
@@ -564,6 +569,7 @@ export default function InspectorPanel({
   isAudioPlaying,
   audioStatus,
   messageComponents,
+  collapsed,
   onCarrierAmplitudeChange,
   onCarrierFrequencyChange,
   onCarrierPhaseChange,
@@ -583,15 +589,48 @@ export default function InspectorPanel({
   onResetPlot,
   onPlayAudio,
   onStopAudio,
+  onToggleCollapsed,
 }: InspectorPanelProps) {
+  const supportsModulationIndex = activeAmplitudeScheme === "DSB-LC";
+
+  if (collapsed) {
+    return (
+      <aside className="flex w-[56px] shrink-0 flex-col items-center border-l border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-low)] py-4">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="mb-4 flex h-9 w-9 items-center justify-center rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white text-lg text-[color:var(--ui-text)] transition-colors hover:bg-[color:var(--ui-surface-lowest)]"
+          aria-label="Expand right sidebar"
+          title="Expand inspector"
+        >
+          &lt;
+        </button>
+        <div className="rounded-[8px] border border-[color:var(--ui-outline-variant)] bg-white px-2 py-3 text-center">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-outline)]">
+            DSP
+          </div>
+          <div className="mt-2 [writing-mode:vertical-rl] rotate-180 text-[10px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-text-muted)]">
+            Inspector
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="flex w-[320px] shrink-0 flex-col border-l border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-low)]">
       <div className="flex items-center justify-between border-b border-[color:var(--ui-outline-variant)] p-4">
         <h2 className="text-sm font-semibold uppercase tracking-tight">
-          DSB-LC Parameters
+          {activeAmplitudeScheme} Parameters
         </h2>
-        <button type="button" className="rounded p-1 text-[color:var(--ui-outline)]">
-          i
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white text-lg text-[color:var(--ui-outline)] transition-colors hover:bg-[color:var(--ui-surface-lowest)]"
+          aria-label="Collapse right sidebar"
+          title="Collapse inspector"
+        >
+          &gt;
         </button>
       </div>
 
@@ -643,15 +682,26 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
-          <RangeField
-            title="Modulation Index"
-            valueLabel={`a = ${settings.modulationIndex.toFixed(2)}`}
-            min={0}
-            max={1.5}
-            step={0.05}
-            value={settings.modulationIndex}
-            onChange={onModulationIndexChange}
-          />
+          {supportsModulationIndex ? (
+            <RangeField
+              title="Modulation Index"
+              valueLabel={`a = ${settings.modulationIndex.toFixed(2)}`}
+              min={0}
+              max={1.5}
+              step={0.05}
+              value={settings.modulationIndex}
+              onChange={onModulationIndexChange}
+            />
+          ) : (
+            <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-3 text-sm leading-6 text-[color:var(--ui-text-muted)]">
+              <div className="font-medium text-[color:var(--ui-text)]">
+                Suppressed carrier mode
+              </div>
+              <div className="mt-2 font-mono text-xs text-[color:var(--ui-outline)]">
+                u_DSB-SC(t) = A_c m(t) cos(2pi f_c t)
+              </div>
+            </div>
+          )}
           <button
             type="button"
             onClick={onResetSignals}

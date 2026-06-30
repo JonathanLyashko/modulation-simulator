@@ -18,13 +18,11 @@ function formatFrequencyLabel(frequency: number) {
 function SignalBlock({
   nodeLabel,
   title,
-  expression,
   selected = false,
   onClick,
 }: {
   nodeLabel: string;
   title: string;
-  expression: string;
   selected?: boolean;
   onClick?: () => void;
 }) {
@@ -44,9 +42,6 @@ function SignalBlock({
           {nodeLabel}
         </span>
         <span className="mt-3 text-sm font-semibold">{title}</span>
-        <span className="mt-2 px-2 text-[11px] leading-5 text-[color:var(--ui-outline)]">
-          {expression}
-        </span>
         <div className="absolute -left-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-[color:var(--ui-surface)] bg-[color:var(--ui-primary)]" />
         <div className="absolute -right-2 top-1/2 h-4 w-4 -translate-y-1/2 rounded-full border-2 border-[color:var(--ui-surface)] bg-[color:var(--ui-primary)]" />
       </button>
@@ -92,11 +87,9 @@ function Arrow() {
 }
 
 function CarrierFeed({
-  expression,
   selected,
   onClick,
 }: {
-  expression: string;
   selected: boolean;
   onClick: () => void;
 }) {
@@ -105,11 +98,18 @@ function CarrierFeed({
       <SignalBlock
         nodeLabel="CARRIER"
         title="Carrier Signal"
-        expression={expression}
         selected={selected}
         onClick={onClick}
       />
-      <div className="h-8 w-px bg-[color:var(--ui-outline)]" />
+      <svg className="h-8 w-4 overflow-visible" fill="none" aria-hidden="true">
+        <path
+          d="M8 0V22"
+          stroke="var(--ui-outline)"
+          strokeWidth="2"
+          strokeLinejoin="miter"
+        />
+        <path d="M8 28L4 22H12L8 28Z" fill="var(--ui-outline)" />
+      </svg>
     </div>
   );
 }
@@ -120,18 +120,8 @@ export default function BlockCanvas({
   selectedSignalView,
   onSelectSignalView,
 }: BlockCanvasProps) {
-  const messageExpression =
-    settings.messageComponents.length === 0
-      ? "m(t) = 0"
-      : `m(t) = ${settings.messageComponents
-          .slice(0, 2)
-          .map((component) => {
-            const basis = component.type === "sine" ? "sin" : "cos";
-            return `${component.amplitude.toFixed(2)} ${basis}(2pi ${formatFrequencyLabel(component.frequency)} t)`;
-          })
-          .join(" + ")}${settings.messageComponents.length > 2 ? " + ..." : ""}`;
-  const carrierExpression = `c(t) = ${settings.carrier.amplitude.toFixed(2)} cos(2pi ${formatFrequencyLabel(settings.carrier.frequency)} t)`;
-  const modulatedExpression = `u(t) = A_c [1 + a m_n(t)] cos(2pi f_c t)`;
+  void settings;
+  void formatFrequencyLabel;
 
   return (
     <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle,_var(--ui-dot-grid)_1.1px,_transparent_1.1px)] [background-size:20px_20px]">
@@ -140,27 +130,24 @@ export default function BlockCanvas({
           <SignalBlock
             nodeLabel="MESSAGE"
             title="Message Signal"
-            expression={messageExpression}
             selected={selectedSignalView === "message"}
             onClick={() => onSelectSignalView("message")}
           />
           <Arrow />
           <div className="relative">
             <CarrierFeed
-              expression={carrierExpression}
               selected={selectedSignalView === "carrier"}
               onClick={() => onSelectSignalView("carrier")}
             />
             <SignalBlock
               nodeLabel="MODULATOR"
               title={`${activeModulation} Modulator`}
-              expression={modulatedExpression}
               selected={selectedSignalView === "modulated"}
               onClick={() => onSelectSignalView("modulated")}
             />
           </div>
           <Arrow />
-          <UtilityBlock title="Channel" subtitle="AWGN 10 dB" />
+          <UtilityBlock title="Channel" />
           <Arrow />
           <UtilityBlock title="Demodulator" />
         </div>

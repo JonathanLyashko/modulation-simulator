@@ -5,6 +5,7 @@ import { startTransition, useEffect, useEffectEvent, useRef, useState } from "re
 import { playSignalSamples, stopAudioPlayback } from "@/app/lib/audioPlayback";
 import {
   createDspClient,
+  generateDsbScBundle,
   generateDsbLcBundle,
   readSignalSnapshot,
 } from "@/app/lib/dspClient";
@@ -79,6 +80,8 @@ function createDefaultFrequencyPlotSettings(
   };
 }
 
+const SUPPORTED_AMPLITUDE_SCHEMES: AnalogAmplitudeScheme[] = ["DSB-LC", "DSB-SC"];
+
 export default function SignalWorkspace() {
   const activeSignalIdsRef = useRef<number[]>([]);
   const playbackIntervalRef = useRef<number | null>(null);
@@ -126,6 +129,8 @@ export default function SignalWorkspace() {
   );
   const [spectrumDisplayMode, setSpectrumDisplayMode] =
     useState<SpectrumDisplayMode>("magnitude");
+  const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
+  const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
 
   const requestedWindowSeconds = Math.max(
     DISPLAY_WINDOW_SECONDS,
@@ -155,7 +160,7 @@ export default function SignalWorkspace() {
   );
 
   useEffect(() => {
-    if (activeAmplitudeScheme !== "DSB-LC") {
+    if (!SUPPORTED_AMPLITUDE_SCHEMES.includes(activeAmplitudeScheme)) {
       return;
     }
 
@@ -164,15 +169,21 @@ export default function SignalWorkspace() {
     async function runDsbLcGeneration() {
       try {
         const dsp = await createDspClient();
-        const bundle = await generateDsbLcBundle({
+        const sharedOptions = {
           length: sampleCount,
           sampleRate,
           messageComponents: settings.messageComponents,
           carrierAmplitude: settings.carrier.amplitude,
           carrierFrequency: settings.carrier.frequency,
           carrierPhase: settings.carrier.phase,
-          modulationIndex: settings.modulationIndex,
-        });
+        };
+        const bundle =
+          activeAmplitudeScheme === "DSB-SC"
+            ? await generateDsbScBundle(sharedOptions)
+            : await generateDsbLcBundle({
+                ...sharedOptions,
+                modulationIndex: settings.modulationIndex,
+              });
 
         if (disposed) {
           dsp.destroySignal(bundle.message.signalId);
@@ -422,13 +433,20 @@ export default function SignalWorkspace() {
           <SideNav
             activeAmplitudeScheme={activeAmplitudeScheme}
             activeAngleScheme={activeAngleScheme}
+            collapsed={isLeftSidebarCollapsed}
             onSelectAmplitudeScheme={(scheme) => {
               setActiveAmplitudeScheme(scheme);
-              if (scheme !== "DSB-LC" && selectedSignalView === "modulated") {
+              if (
+                !SUPPORTED_AMPLITUDE_SCHEMES.includes(scheme) &&
+                selectedSignalView === "modulated"
+              ) {
                 setSelectedSignalView("message");
               }
             }}
             onSelectAngleScheme={setActiveAngleScheme}
+            onToggleCollapsed={() => {
+              setIsLeftSidebarCollapsed((current) => !current);
+            }}
           />
 
           <main className="flex min-w-0 flex-1 flex-col bg-[color:var(--ui-surface)]">
@@ -450,6 +468,7 @@ export default function SignalWorkspace() {
           </main>
 
           <InspectorPanel
+            activeAmplitudeScheme={activeAmplitudeScheme}
             settings={settings}
             plotSettings={plotSettings}
             frequencyPlotSettings={frequencyPlotSettings}
@@ -457,6 +476,7 @@ export default function SignalWorkspace() {
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
             messageComponents={settings.messageComponents}
+            collapsed={isRightSidebarCollapsed}
             onCarrierAmplitudeChange={(value) => {
               if (Number.isFinite(value)) {
                 setSettings((current) => ({
@@ -646,6 +666,9 @@ export default function SignalWorkspace() {
             }}
             onStopAudio={() => {
               void handleStopAudio();
+            }}
+            onToggleCollapsed={() => {
+              setIsRightSidebarCollapsed((current) => !current);
             }}
           />
         </div>

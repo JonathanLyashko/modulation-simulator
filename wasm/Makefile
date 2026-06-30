@@ -9,7 +9,7 @@ SRCS = $(wildcard $(SRC_DIR)/*.cpp)
 OUT_JS = $(OUT_DIR)/dsp.js
 OUT_WASM = $(OUT_DIR)/dsp.wasm
 
-EXPORTS = '["_dsp_create_signal","_dsp_destroy_signal","_dsp_get_signal_ptr","_dsp_get_signal_length","_dsp_get_signal_sample_rate","_dsp_get_signal_sample","_dsp_fft_magnitude_spectrum","_dsp_clear_signal","_dsp_add_sine_component","_dsp_add_cosine_component","_dsp_generate_carrier","_dsp_generate_sine","_dsp_am_modulate","_dsp_fm_modulate","_dsp_pm_modulate"]'
+EXPORTS = '["_dsp_create_signal","_dsp_destroy_signal","_dsp_get_signal_ptr","_dsp_get_signal_length","_dsp_get_signal_sample_rate","_dsp_get_signal_sample","_dsp_fft_magnitude_spectrum","_dsp_clear_signal","_dsp_add_sine_component","_dsp_add_cosine_component","_dsp_generate_carrier","_dsp_generate_sine","_dsp_am_modulate","_dsp_dsb_sc_modulate","_dsp_fm_modulate","_dsp_pm_modulate"]'
 RUNTIME_EXPORTS = '["ccall","cwrap"]'
 
 CXXFLAGS = -I$(INC_DIR) -O3

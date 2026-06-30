@@ -88,6 +88,34 @@ int amModulate(int messageSignalId, const AmModulationParameters& parameters) {
     return outputSignalId;
 }
 
+int dsbScModulate(
+    int messageSignalId,
+    const DsbScModulationParameters& parameters
+) {
+    Signal* message = getWritableSignal(messageSignalId);
+    if (message == nullptr) {
+        return -1;
+    }
+
+    const int outputSignalId = createOutputLike(*message);
+    Signal* output = getSignal(outputSignalId);
+    if (output == nullptr) {
+        return -1;
+    }
+
+    const float angularFrequency = 2.0f * kPi * parameters.carrier.frequency;
+
+    for (std::size_t index = 0; index < message->samples.size(); ++index) {
+        const float time = static_cast<float>(index) / static_cast<float>(message->sampleRate);
+        const float carrier =
+            std::cos(angularFrequency * time + parameters.carrier.phase);
+        output->samples[index] =
+            parameters.carrier.amplitude * message->samples[index] * carrier;
+    }
+
+    return outputSignalId;
+}
+
 int fmModulate(int messageSignalId, const FmModulationParameters& parameters) {
     Signal* message = getWritableSignal(messageSignalId);
     if (message == nullptr) {

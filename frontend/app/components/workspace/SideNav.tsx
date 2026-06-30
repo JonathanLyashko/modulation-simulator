@@ -5,8 +5,10 @@ import type { AnalogAmplitudeScheme, AnalogAngleScheme } from "./types";
 type SideNavProps = {
   activeAmplitudeScheme: AnalogAmplitudeScheme;
   activeAngleScheme: AnalogAngleScheme;
+  collapsed: boolean;
   onSelectAmplitudeScheme: (scheme: AnalogAmplitudeScheme) => void;
   onSelectAngleScheme: (scheme: AnalogAngleScheme) => void;
+  onToggleCollapsed: () => void;
 };
 
 const AM_VARIANTS = ["DSB-LC", "DSB-SC", "SSB+", "SSB_"] as const;
@@ -50,18 +52,64 @@ function LibraryGroupButton({
 export default function SideNav({
   activeAmplitudeScheme,
   activeAngleScheme,
+  collapsed,
   onSelectAmplitudeScheme,
   onSelectAngleScheme,
+  onToggleCollapsed,
 }: SideNavProps) {
   const [amExpanded, setAmExpanded] = useState(true);
   const [angleExpanded, setAngleExpanded] = useState(true);
 
+  if (collapsed) {
+    return (
+      <aside className="flex w-[56px] shrink-0 flex-col items-center border-r border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-high)] py-4">
+        <button
+          type="button"
+          onClick={onToggleCollapsed}
+          className="mb-4 flex h-9 w-9 items-center justify-center rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white text-lg text-[color:var(--ui-text)] transition-colors hover:bg-[color:var(--ui-surface-lowest)]"
+          aria-label="Expand left sidebar"
+          title="Expand library"
+        >
+          &gt;
+        </button>
+        <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[color:var(--ui-primary-container)] text-[11px] font-bold text-[color:var(--ui-on-primary-container)]">
+          DSP
+        </div>
+        <div className="mt-6 flex flex-1 flex-col items-center gap-3">
+          <div
+            className="rounded-full bg-[color:var(--ui-secondary-container)] px-2 py-1 text-[10px] font-semibold text-[color:var(--ui-on-secondary-container)]"
+            title={`Amplitude modulation: ${activeAmplitudeScheme}`}
+          >
+            AM
+          </div>
+          <div
+            className="rounded-full border border-[color:var(--ui-outline-variant)] px-2 py-1 text-[10px] font-semibold text-[color:var(--ui-text-muted)]"
+            title={`Angle modulation: ${activeAngleScheme}`}
+          >
+            PM
+          </div>
+        </div>
+      </aside>
+    );
+  }
+
   return (
     <aside className="flex w-[280px] shrink-0 flex-col border-r border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-high)] px-3 py-4">
       <div className="mb-6 px-3">
-        <p className="mb-3 text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-outline)]">
-          Component Library
-        </p>
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-[color:var(--ui-outline)]">
+            Component Library
+          </p>
+          <button
+            type="button"
+            onClick={onToggleCollapsed}
+            className="flex h-8 w-8 items-center justify-center rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white text-lg text-[color:var(--ui-text)] transition-colors hover:bg-[color:var(--ui-surface-lowest)]"
+            aria-label="Collapse left sidebar"
+            title="Collapse library"
+          >
+            &lt;
+          </button>
+        </div>
         <div className="flex items-center gap-3">
           <div className="flex h-10 w-10 items-center justify-center rounded-[12px] bg-[color:var(--ui-primary-container)] text-[11px] font-bold text-[color:var(--ui-on-primary-container)]">
             DSP

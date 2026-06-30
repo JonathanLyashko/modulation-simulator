@@ -17,6 +17,10 @@ struct AmModulationParameters {
     float modulationIndex;
 };
 
+struct DsbScModulationParameters {
+    CarrierParameters carrier;
+};
+
 struct FmModulationParameters {
     CarrierParameters carrier;
     float frequencySensitivity;
@@ -30,5 +34,9 @@ struct PmModulationParameters {
 void generateCarrier(int signalId, const CarrierParameters& parameters);
 void generateSine(int signalId, const ToneParameters& parameters);
 int amModulate(int messageSignalId, const AmModulationParameters& parameters);
+int dsbScModulate(
+    int messageSignalId,
+    const DsbScModulationParameters& parameters
+);
 int fmModulate(int messageSignalId, const FmModulationParameters& parameters);
 int pmModulate(int messageSignalId, const PmModulationParameters& parameters);

@@ -106,6 +106,21 @@ int dsp_am_modulate(
     });
 }
 
+int dsp_dsb_sc_modulate(
+    int message_signal_id,
+    float carrier_frequency,
+    float carrier_amplitude,
+    float initial_phase
+) {
+    return dsbScModulate(message_signal_id, DsbScModulationParameters{
+        CarrierParameters{
+            carrier_amplitude,
+            carrier_frequency,
+            initial_phase,
+        },
+    });
+}
+
 int dsp_fm_modulate(
     int message_signal_id,
     float carrier_frequency,
