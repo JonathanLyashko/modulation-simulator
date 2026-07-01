@@ -229,16 +229,6 @@ export default function SideNav({
         <div className="px-3 text-[12px] text-[color:var(--ui-text-muted)]">
           Coming later
         </div>
-
-        <div className="mt-4 border-t border-[color:var(--ui-outline-variant)] pt-4">
-          <button
-            type="button"
-            className="flex w-full items-center justify-center gap-2 rounded-[2px] border border-dashed border-[color:var(--ui-outline-variant)] px-3 py-2 text-sm text-[color:var(--ui-text-muted)]"
-          >
-            <span className="text-base">+</span>
-            Add Block
-          </button>
-        </div>
       </div>
 
       <div className="mt-auto space-y-1 pt-6">
@@ -258,3 +248,5 @@ export default function SideNav({
     </aside>
   );
 }
+
+

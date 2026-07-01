@@ -10,9 +10,11 @@ import type {
   FrequencyPlotSettings,
   MessageComponent,
   MessageComponentType,
+  MessageSourceMode,
   ModulatorSettings,
   OscillatorSettings,
   PlotSettings,
+  RecordedMessageClip,
   SignalView,
   SsbSideband,
   SpectrumDisplayMode,
@@ -31,6 +33,11 @@ type InspectorPanelProps = {
   selectedSignalLabel: string;
   isAudioPlaying: boolean;
   audioStatus: string;
+  messageSourceMode: MessageSourceMode;
+  recordingDurationSeconds: number;
+  recordedMessageClip: RecordedMessageClip | null;
+  recordingState: "idle" | "recording" | "processing";
+  recordingStatus: string;
   messageComponents: MessageComponent[];
   ssbSideband: SsbSideband;
   collapsed: boolean;
@@ -38,6 +45,8 @@ type InspectorPanelProps = {
   onCarrierFrequencyChange: (value: number) => void;
   onCarrierPhaseChange: (value: number) => void;
   onAddMessageComponent: (type: MessageComponentType) => void;
+  onMessageSourceModeChange: (mode: MessageSourceMode) => void;
+  onRecordingDurationChange: (value: number) => void;
   onUpdateMessageComponent: (
     componentId: string,
     field: "amplitude" | "frequency" | "phase",
@@ -46,6 +55,7 @@ type InspectorPanelProps = {
   onRemoveMessageComponent: (componentId: string) => void;
   onModulationIndexChange: (value: number) => void;
   onFrequencySensitivityChange: (value: number) => void;
+  onPhaseSensitivityChange: (value: number) => void;
   onSsbSidebandChange: (sideband: SsbSideband) => void;
   onPlotSignalVisibilityChange: (view: SignalView, visible: boolean) => void;
   onPlotSignalXScaleChange: (view: SignalView, value: number) => void;
@@ -59,6 +69,9 @@ type InspectorPanelProps = {
   onResetSignals: () => void;
   onResetPlot: () => void;
   onPlayAudio: () => void;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  onClearRecordedClip: () => void;
   onStopAudio: () => void;
   onToggleCollapsed: () => void;
 };
@@ -73,7 +86,7 @@ function RangeField({
   onChange,
 }: {
   title: string;
-  valueLabel: string;
+  valueLabel: ReactNode;
   min: number;
   max: number;
   step: number;
@@ -111,6 +124,28 @@ function RangeField({
         className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-3 py-2 text-center font-mono"
       />
     </div>
+  );
+}
+
+function SubscriptLabel({
+  base,
+  subscript,
+  value,
+  unit,
+}: {
+  base: string;
+  subscript: string;
+  value: string;
+  unit: string;
+}) {
+  return (
+    <>
+      <span>{base}</span>
+      <sub>{subscript}</sub>
+      <span> = {value}</span>
+      <br />
+      <span>{unit}</span>
+    </>
   );
 }
 
@@ -162,6 +197,121 @@ function CompactRangeField({
           }}
           className="w-full rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-lowest)] px-2 py-1.5 text-center font-mono"
         />
+      </div>
+    </div>
+  );
+}
+
+function MessageSourceModeToggle({
+  mode,
+  disabled = false,
+  onChange,
+}: {
+  mode: MessageSourceMode;
+  disabled?: boolean;
+  onChange: (mode: MessageSourceMode) => void;
+}) {
+  return (
+    <div className="grid grid-cols-2 gap-2">
+      {([
+        ["preset", "Preset Waves"],
+        ["recorded", "Recorded Clip"],
+      ] as const).map(([value, label]) => (
+        <button
+          key={value}
+          type="button"
+          onClick={() => {
+            onChange(value);
+          }}
+          disabled={disabled}
+          className={[
+            "rounded-[2px] border px-3 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+            mode === value
+              ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
+              : "border-[color:var(--ui-outline-variant)] bg-white text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]",
+          ].join(" ")}
+        >
+          {label}
+        </button>
+      ))}
+    </div>
+  );
+}
+
+function RecordedMessageSection({
+  recordingDurationSeconds,
+  recordedMessageClip,
+  recordingState,
+  recordingStatus,
+  onRecordingDurationChange,
+  onStartRecording,
+  onStopRecording,
+  onClearRecordedClip,
+}: {
+  recordingDurationSeconds: number;
+  recordedMessageClip: RecordedMessageClip | null;
+  recordingState: "idle" | "recording" | "processing";
+  recordingStatus: string;
+  onRecordingDurationChange: (value: number) => void;
+  onStartRecording: () => void;
+  onStopRecording: () => void;
+  onClearRecordedClip: () => void;
+}) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-text-muted)]">
+          Recorded Clip
+        </div>
+        <div className="mt-3 text-sm text-[color:var(--ui-text)]">
+          {recordedMessageClip
+            ? `${recordedMessageClip.durationSeconds.toFixed(2)} s, ${recordedMessageClip.sampleRate.toFixed(0)} Hz`
+            : "No clip recorded yet."}
+        </div>
+        <div className="mt-2 text-xs text-[color:var(--ui-text-muted)]">
+          {recordingStatus}
+        </div>
+      </div>
+
+      <RangeField
+        title="Clip Limit"
+        valueLabel={`${recordingDurationSeconds.toFixed(0)} s`}
+        min={1}
+        max={10}
+        step={1}
+        value={recordingDurationSeconds}
+        onChange={onRecordingDurationChange}
+      />
+
+      <div className="grid grid-cols-3 gap-2">
+        <button
+          type="button"
+          onClick={onStartRecording}
+          disabled={recordingState !== "idle"}
+          className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-primary)] px-3 py-2 text-sm font-medium text-white transition-colors hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Record
+        </button>
+        <button
+          type="button"
+          onClick={onStopRecording}
+          disabled={recordingState !== "recording"}
+          className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] transition-colors hover:bg-[color:var(--ui-surface-high)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Stop
+        </button>
+        <button
+          type="button"
+          onClick={onClearRecordedClip}
+          disabled={!recordedMessageClip && recordingState === "idle"}
+          className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] transition-colors hover:bg-[color:var(--ui-surface-high)] disabled:cursor-not-allowed disabled:opacity-50"
+        >
+          Clear
+        </button>
+      </div>
+
+      <div className="text-xs text-[color:var(--ui-text-muted)]">
+        A 5 second default is a good tradeoff. The UI allows up to 10 seconds.
       </div>
     </div>
   );
@@ -339,7 +489,9 @@ function MessageExpressionSummary({
               return (
                 <div
                   key={component.id}
-                  className={`flex items-start gap-2 leading-7 ${sizeClass}`}
+                  className={
+                    'flex items-start gap-2 leading-7 ' + sizeClass
+                  }
                 >
                   <span className="w-12 shrink-0 text-right">
                     {index === 0 ? (
@@ -354,14 +506,14 @@ function MessageExpressionSummary({
                   <span className="min-w-0 break-words">
                     <span>{magnitude}</span>
                     <span className="ml-1 italic">{basis}</span>
-                    <span>(2π</span>
+                    <span>(2&pi;</span>
                     <span className="italic">f</span>
                     <sub>{index + 1}</sub>
                     <span>t</span>
                     {component.phase !== 0 ? (
                       <>
                         <span> + </span>
-                        <span>φ</span>
+                        <span>&phi;</span>
                         <sub>{index + 1}</sub>
                       </>
                     ) : null}
@@ -378,7 +530,7 @@ function MessageExpressionSummary({
                 <span>
                   {" "}
                   = {component.frequency.toFixed(component.frequency < 10 ? 1 : 0)} Hz,
-                  {" "}φ{index + 1} = {component.phase.toFixed(0)}°
+                  {" "}&phi;{index + 1} = {component.phase.toFixed(0)}&deg;
                 </span>
               </span>
             ))}
@@ -413,7 +565,7 @@ function ModulationEquationCard({
 }
 
 function PiSymbol() {
-  return <span>π</span>;
+  return <span>&pi;</span>;
 }
 
 function HilbertMSymbol() {
@@ -471,14 +623,35 @@ function FmExpression() {
       <PiSymbol />
       <span className="italic">k</span>
       <sub>f</sub>
-      <span> ∫</span>
+      <span> &int;</span>
       <sub>0</sub>
       <sup>t</sup>
       <span> </span>
       <span className="italic">m</span>
-      <span>(tau)d</span>
-      <span className="italic">tau</span>
-      <span> + phi</span>
+      <span>(&tau;)d</span>
+      <span className="italic">&tau;</span>
+      <span> + &phi;</span>
+      <sub>0</sub>
+      <span>]</span>
+    </>
+  );
+}
+
+function PmExpression() {
+  return (
+    <>
+      <span className="italic">A</span>
+      <sub>c</sub>
+      <span className="italic">cos</span>
+      <span>[2&pi;</span>
+      <span className="italic">f</span>
+      <sub>c</sub>
+      <span>t + </span>
+      <span className="italic">k</span>
+      <sub>p</sub>
+      <span> </span>
+      <span className="italic">m</span>
+      <span>(t) + &phi;</span>
       <sub>0</sub>
       <span>]</span>
     </>
@@ -740,7 +913,7 @@ function PlotSignalSettingsSection({
         title="X Axis Scale"
         valueLabel={`${(xScaleSecondsPerDivision * 1000).toFixed(2)} ms/div`}
         min={0.0005}
-        max={0.05}
+        max={1}
         step={0.0005}
         value={xScaleSecondsPerDivision}
         onChange={(value) => {
@@ -775,6 +948,11 @@ export default function InspectorPanel({
   selectedSignalLabel,
   isAudioPlaying,
   audioStatus,
+  messageSourceMode,
+  recordingDurationSeconds,
+  recordedMessageClip,
+  recordingState,
+  recordingStatus,
   messageComponents,
   ssbSideband,
   collapsed,
@@ -782,10 +960,13 @@ export default function InspectorPanel({
   onCarrierFrequencyChange,
   onCarrierPhaseChange,
   onAddMessageComponent,
+  onMessageSourceModeChange,
+  onRecordingDurationChange,
   onUpdateMessageComponent,
   onRemoveMessageComponent,
   onModulationIndexChange,
   onFrequencySensitivityChange,
+  onPhaseSensitivityChange,
   onSsbSidebandChange,
   onPlotSignalVisibilityChange,
   onPlotSignalXScaleChange,
@@ -799,13 +980,20 @@ export default function InspectorPanel({
   onResetSignals,
   onResetPlot,
   onPlayAudio,
+  onStartRecording,
+  onStopRecording,
+  onClearRecordedClip,
   onStopAudio,
   onToggleCollapsed,
 }: InspectorPanelProps) {
-  const supportsModulationIndex = activeAmplitudeScheme === "DSB-LC";
-  const isSsbMode = activeAmplitudeScheme === "SSB";
+  const isAmplitudeFamily = activeModulationFamily === "amplitude";
+  const supportsModulationIndex =
+    isAmplitudeFamily && activeAmplitudeScheme === "DSB-LC";
+  const isSsbMode = isAmplitudeFamily && activeAmplitudeScheme === "SSB";
   const isFmMode =
     activeModulationFamily === "angle" && activeAngleScheme === "FM";
+  const isPmMode =
+    activeModulationFamily === "angle" && activeAngleScheme === "PM";
 
   if (collapsed) {
     return (
@@ -861,38 +1049,58 @@ export default function InspectorPanel({
         </CollapsibleSection>
 
         <CollapsibleSection title="Message Settings">
-          <MessageExpressionSummary messageComponents={messageComponents} />
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => {
-                onAddMessageComponent("sine");
-              }}
-              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
-            >
-              Add Sine
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                onAddMessageComponent("cosine");
-              }}
-              className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
-            >
-              Add Cosine
-            </button>
-          </div>
-          <div className="space-y-2">
-            {messageComponents.map((component) => (
-              <MessageComponentEditor
-                key={component.id}
-                component={component}
-                canRemove={messageComponents.length > 1}
-                onUpdate={onUpdateMessageComponent}
-                onRemove={onRemoveMessageComponent}
-              />
-            ))}
-          </div>
+          <MessageSourceModeToggle
+            mode={messageSourceMode}
+            disabled={recordingState !== "idle"}
+            onChange={onMessageSourceModeChange}
+          />
+          {messageSourceMode === "preset" ? (
+            <>
+              <MessageExpressionSummary messageComponents={messageComponents} />
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddMessageComponent("sine");
+                  }}
+                  className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+                >
+                  Add Sine
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    onAddMessageComponent("cosine");
+                  }}
+                  className="rounded-[2px] border border-[color:var(--ui-outline-variant)] bg-white px-3 py-2 text-sm font-medium text-[color:var(--ui-text)] hover:bg-[color:var(--ui-surface-high)]"
+                >
+                  Add Cosine
+                </button>
+              </div>
+              <div className="space-y-2">
+                {messageComponents.map((component) => (
+                  <MessageComponentEditor
+                    key={component.id}
+                    component={component}
+                    canRemove={messageComponents.length > 1}
+                    onUpdate={onUpdateMessageComponent}
+                    onRemove={onRemoveMessageComponent}
+                  />
+                ))}
+              </div>
+            </>
+          ) : (
+            <RecordedMessageSection
+              recordingDurationSeconds={recordingDurationSeconds}
+              recordedMessageClip={recordedMessageClip}
+              recordingState={recordingState}
+              recordingStatus={recordingStatus}
+              onRecordingDurationChange={onRecordingDurationChange}
+              onStartRecording={onStartRecording}
+              onStopRecording={onStopRecording}
+              onClearRecordedClip={onClearRecordedClip}
+            />
+          )}
         </CollapsibleSection>
 
         <CollapsibleSection title="Modulator Settings">
@@ -911,12 +1119,50 @@ export default function InspectorPanel({
               />
               <RangeField
                 title="Frequency Sensitivity"
-                valueLabel={`k_f = ${settings.frequencySensitivity.toFixed(0)} Hz/unit`}
+                valueLabel={
+                  <SubscriptLabel
+                    base="k"
+                    subscript="f"
+                    value={settings.frequencySensitivity.toFixed(0)}
+                    unit="Hz/unit"
+                  />
+                }
                 min={0}
                 max={5000}
                 step={10}
                 value={settings.frequencySensitivity}
                 onChange={onFrequencySensitivityChange}
+              />
+            </>
+          ) : null}
+          {isPmMode ? (
+            <>
+              <ModulationEquationCard
+                title="PM equation"
+                leftSide={
+                  <>
+                    <span className="italic">u</span>
+                    <sub>PM</sub>
+                    <span>(t)</span>
+                  </>
+                }
+                expression={<PmExpression />}
+              />
+              <RangeField
+                title="Phase Sensitivity"
+                valueLabel={
+                  <SubscriptLabel
+                    base="k"
+                    subscript="p"
+                    value={settings.phaseSensitivity.toFixed(2)}
+                    unit="rad/unit"
+                  />
+                }
+                min={0}
+                max={20}
+                step={0.1}
+                value={settings.phaseSensitivity}
+                onChange={onPhaseSensitivityChange}
               />
             </>
           ) : null}
@@ -933,7 +1179,7 @@ export default function InspectorPanel({
               expression={<SsbExpression sideband={ssbSideband} />}
             />
           ) : null}
-          {!isSsbMode && !isFmMode ? (
+          {!isSsbMode && !isFmMode && !isPmMode ? (
             <ModulationEquationCard
             title={
               supportsModulationIndex
@@ -982,7 +1228,7 @@ export default function InspectorPanel({
                       <span>(t)</span>
                       <span> </span>
                       <span className="italic">cos</span>
-                      <span>(2Ï€</span>
+                      <span>(2&pi;</span>
                       <span className="italic">f</span>
                       <sub>c</sub>
                       <span>t) </span>
@@ -991,7 +1237,7 @@ export default function InspectorPanel({
                       <span className="italic">m̂</span>
                       <span>(t) </span>
                       <span className="italic">sin</span>
-                      <span>(2Ï€</span>
+                      <span>(2&pi;</span>
                       <span className="italic">f</span>
                       <sub>c</sub>
                       <span>t)]</span>
@@ -1172,3 +1418,5 @@ export default function InspectorPanel({
     </aside>
   );
 }
+
+

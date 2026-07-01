@@ -4,10 +4,16 @@ import { startTransition, useEffect, useEffectEvent, useRef, useState } from "re
 
 import { playSignalSamples, stopAudioPlayback } from "@/app/lib/audioPlayback";
 import {
+  cancelAudioRecording,
+  startAudioRecording,
+  stopAudioRecording,
+} from "@/app/lib/audioRecording";
+import {
   createDspClient,
   generateDsbScBundle,
   generateDsbLcBundle,
   generateFmBundle,
+  generatePmBundle,
   generateSsbBundle,
   readSignalSnapshot,
 } from "@/app/lib/dspClient";
@@ -21,7 +27,9 @@ import {
   DEFAULT_MODULATOR_SETTINGS,
   DEFAULT_PLOT_SETTINGS,
   DISPLAY_WINDOW_SECONDS,
+  MAX_RECORDING_DURATION_SECONDS,
   MIN_SAMPLE_RATE,
+  MIN_RECORDING_DURATION_SECONDS,
   NYQUIST_MULTIPLIER,
   SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE,
 } from "./constants";
@@ -36,6 +44,7 @@ import type {
   MessageComponentType,
   ModulatorSettings,
   PlotSettings,
+  RecordedMessageClip,
   SignalSnapshot,
   SignalView,
   SsbSideband,
@@ -90,6 +99,7 @@ const SUPPORTED_AMPLITUDE_SCHEMES: AnalogAmplitudeScheme[] = ["DSB-LC", "DSB-SC"
 export default function SignalWorkspace() {
   const activeSignalIdsRef = useRef<number[]>([]);
   const playbackIntervalRef = useRef<number | null>(null);
+  const recordingTimeoutRef = useRef<number | null>(null);
   const playbackStartedAtRef = useRef<number | null>(null);
   const playbackDurationRef = useRef<number>(0);
   const activePlaybackSignalIdRef = useRef<number | null>(null);
@@ -133,6 +143,12 @@ export default function SignalWorkspace() {
     );
   const [isAudioPlaying, setIsAudioPlaying] = useState(false);
   const [audioStatus, setAudioStatus] = useState("Ready");
+  const [recordedMessageClip, setRecordedMessageClip] =
+    useState<RecordedMessageClip | null>(null);
+  const [recordingState, setRecordingState] = useState<
+    "idle" | "recording" | "processing"
+  >("idle");
+  const [recordingStatus, setRecordingStatus] = useState("No recorded clip");
   const [playbackCursorSeconds, setPlaybackCursorSeconds] = useState<number | null>(
     null
   );
@@ -141,19 +157,26 @@ export default function SignalWorkspace() {
   const [isLeftSidebarCollapsed, setIsLeftSidebarCollapsed] = useState(false);
   const [isRightSidebarCollapsed, setIsRightSidebarCollapsed] = useState(false);
 
+  const recordedMessageBandwidthHz =
+    settings.messageSourceMode === "recorded" && recordedMessageClip
+      ? recordedMessageClip.sampleRate / 2
+      : 0;
   const requestedWindowSeconds = Math.max(
     DISPLAY_WINDOW_SECONDS,
+    settings.messageSourceMode === "recorded" && recordedMessageClip
+      ? recordedMessageClip.durationSeconds
+      : 0,
     ...Object.values(plotSettings).map(
       (signalPlotSettings) => signalPlotSettings.xScaleSecondsPerDivision * 10
     )
   );
   const highestMessageFrequency = settings.messageComponents.reduce(
     (currentMaximum, component) => Math.max(currentMaximum, component.frequency),
-    0
+    settings.messageSourceMode === "recorded" ? recordedMessageBandwidthHz : 0
   );
   const messagePeakUpperBound = settings.messageComponents.reduce(
     (total, component) => total + Math.abs(component.amplitude),
-    0
+    settings.messageSourceMode === "recorded" && recordedMessageClip ? 1 : 0
   );
   const fmDeviationHz = settings.frequencySensitivity * messagePeakUpperBound;
   const activeModulationLabel =
@@ -161,7 +184,7 @@ export default function SignalWorkspace() {
   const supportsCurrentModulation =
     activeModulationFamily === "amplitude"
       ? SUPPORTED_AMPLITUDE_SCHEMES.includes(activeAmplitudeScheme)
-      : activeAngleScheme === "FM";
+      : activeAngleScheme === "FM" || activeAngleScheme === "PM";
   const highestRepresentedFrequency =
     activeModulationFamily === "angle" && activeAngleScheme === "FM"
       ? Math.max(
@@ -175,11 +198,18 @@ export default function SignalWorkspace() {
   const nyquistMinimumSampleRate = Math.ceil(
     highestRepresentedFrequency * NYQUIST_MULTIPLIER
   );
-  const sampleRate = Math.max(
-    MIN_SAMPLE_RATE,
-    nyquistMinimumSampleRate,
-    Math.ceil(highestRepresentedFrequency * SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE)
-  );
+  const sampleRate =
+    settings.messageSourceMode === "recorded"
+      ? Math.max(
+          MIN_SAMPLE_RATE,
+          nyquistMinimumSampleRate,
+          recordedMessageClip?.sampleRate ?? MIN_SAMPLE_RATE
+        )
+      : Math.max(
+          MIN_SAMPLE_RATE,
+          nyquistMinimumSampleRate,
+          Math.ceil(highestRepresentedFrequency * SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE)
+        );
   const sampleCount = Math.max(
     1024,
     frequencyPlotSettings.fftSize,
@@ -242,16 +272,23 @@ export default function SignalWorkspace() {
           length: sampleCount,
           sampleRate,
           messageComponents: settings.messageComponents,
+          recordedMessage:
+            settings.messageSourceMode === "recorded" ? recordedMessageClip : null,
           carrierAmplitude: settings.carrier.amplitude,
           carrierFrequency: settings.carrier.frequency,
           carrierPhase: settings.carrier.phase,
         };
         const bundle =
           activeModulationFamily === "angle"
-            ? await generateFmBundle({
-                ...sharedOptions,
-                frequencySensitivity: settings.frequencySensitivity,
-              })
+            ? activeAngleScheme === "PM"
+              ? await generatePmBundle({
+                  ...sharedOptions,
+                  phaseSensitivity: settings.phaseSensitivity,
+                })
+              : await generateFmBundle({
+                  ...sharedOptions,
+                  frequencySensitivity: settings.frequencySensitivity,
+                })
             : activeAmplitudeScheme === "DSB-SC"
               ? await generateDsbScBundle(sharedOptions)
               : activeAmplitudeScheme === "SSB"
@@ -358,6 +395,7 @@ export default function SignalWorkspace() {
     activeAngleScheme,
     activeModulationFamily,
     frequencyPlotSettings.fftSize,
+    recordedMessageClip,
     sampleCount,
     sampleRate,
     settings,
@@ -368,8 +406,12 @@ export default function SignalWorkspace() {
   useEffect(() => {
     return () => {
       void stopAudioPlayback();
+      void cancelAudioRecording();
       if (playbackIntervalRef.current !== null) {
         window.clearInterval(playbackIntervalRef.current);
+      }
+      if (recordingTimeoutRef.current !== null) {
+        window.clearTimeout(recordingTimeoutRef.current);
       }
       if (activeSignalIdsRef.current.length === 0) {
         return;
@@ -395,6 +437,13 @@ export default function SignalWorkspace() {
     if (playbackIntervalRef.current !== null) {
       window.clearInterval(playbackIntervalRef.current);
       playbackIntervalRef.current = null;
+    }
+  }
+
+  function clearRecordingTimer() {
+    if (recordingTimeoutRef.current !== null) {
+      window.clearTimeout(recordingTimeoutRef.current);
+      recordingTimeoutRef.current = null;
     }
   }
 
@@ -500,6 +549,69 @@ export default function SignalWorkspace() {
     setAudioStatus("Stopped");
   }
 
+  async function handleStartRecording() {
+    try {
+      await handleStopAudio();
+      clearRecordingTimer();
+      setRecordingState("recording");
+      setRecordingStatus("Recording from microphone");
+      await startAudioRecording();
+      recordingTimeoutRef.current = window.setTimeout(() => {
+        void handleStopRecording();
+      }, settings.recordingDurationSeconds * 1000);
+    } catch (cause) {
+      clearRecordingTimer();
+      setRecordingState("idle");
+      setRecordingStatus(
+        cause instanceof Error ? cause.message : "Microphone recording failed"
+      );
+    }
+  }
+
+  async function handleStopRecording() {
+    clearRecordingTimer();
+
+    try {
+      setRecordingState("processing");
+      setRecordingStatus("Processing recorded clip");
+      const clip = await stopAudioRecording();
+
+      setRecordedMessageClip(clip);
+      setRecordingState("idle");
+      setRecordingStatus(
+        `Recorded ${clip.durationSeconds.toFixed(2)} s at ${clip.sampleRate.toFixed(0)} Hz`
+      );
+      setSelectedSignalView("message");
+      setSettings((current) => ({
+        ...current,
+        messageSourceMode: "recorded",
+      }));
+      setPlotSettings((current) => ({
+        ...current,
+        message: {
+          ...current.message,
+          xScaleSecondsPerDivision: Math.max(
+            current.message.xScaleSecondsPerDivision,
+            clip.durationSeconds / 10
+          ),
+        },
+      }));
+    } catch (cause) {
+      setRecordingState("idle");
+      setRecordingStatus(
+        cause instanceof Error ? cause.message : "Microphone recording failed"
+      );
+    }
+  }
+
+  async function handleClearRecordedClip() {
+    clearRecordingTimer();
+    await cancelAudioRecording();
+    setRecordingState("idle");
+    setRecordedMessageClip(null);
+    setRecordingStatus("No recorded clip");
+  }
+
   return (
     <div className="min-h-screen bg-[color:var(--ui-background)] p-0 text-[color:var(--ui-text)]">
       <div className="flex h-screen flex-col overflow-hidden rounded-[18px] border border-[#b9bec8] bg-white shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
@@ -512,8 +624,13 @@ export default function SignalWorkspace() {
             setIsRunning(false);
           }}
           onReset={() => {
+            clearRecordingTimer();
+            void cancelAudioRecording();
             setIsRunning(true);
             setSettings(cloneDefaultModulatorSettings());
+            setRecordedMessageClip(null);
+            setRecordingState("idle");
+            setRecordingStatus("No recorded clip");
             setPlotSettings(DEFAULT_PLOT_SETTINGS);
             setFrequencyPlotSettings(
               createDefaultFrequencyPlotSettings(
@@ -583,6 +700,11 @@ export default function SignalWorkspace() {
             selectedSignalLabel={selectedSignalLabel}
             isAudioPlaying={isAudioPlaying}
             audioStatus={audioStatus}
+            messageSourceMode={settings.messageSourceMode}
+            recordingDurationSeconds={settings.recordingDurationSeconds}
+            recordedMessageClip={recordedMessageClip}
+            recordingState={recordingState}
+            recordingStatus={recordingStatus}
             messageComponents={settings.messageComponents}
             ssbSideband={ssbSideband}
             collapsed={isRightSidebarCollapsed}
@@ -626,6 +748,25 @@ export default function SignalWorkspace() {
                   ...current.messageComponents,
                   createMessageComponent(type, current.messageComponents.length + 1),
                 ],
+              }));
+            }}
+            onMessageSourceModeChange={(mode) => {
+              setSettings((current) => ({
+                ...current,
+                messageSourceMode: mode,
+              }));
+            }}
+            onRecordingDurationChange={(value) => {
+              if (!Number.isFinite(value)) {
+                return;
+              }
+
+              setSettings((current) => ({
+                ...current,
+                recordingDurationSeconds: Math.max(
+                  MIN_RECORDING_DURATION_SECONDS,
+                  Math.min(MAX_RECORDING_DURATION_SECONDS, value)
+                ),
               }));
             }}
             onUpdateMessageComponent={(componentId, field, value) => {
@@ -688,6 +829,14 @@ export default function SignalWorkspace() {
                 }));
               }
             }}
+            onPhaseSensitivityChange={(value) => {
+              if (Number.isFinite(value)) {
+                setSettings((current) => ({
+                  ...current,
+                  phaseSensitivity: Math.max(0, Math.min(20, value)),
+                }));
+              }
+            }}
             onSsbSidebandChange={setSsbSideband}
             onPlotSignalVisibilityChange={(view, visible) => {
               setPlotSettings((current) => ({
@@ -707,7 +856,7 @@ export default function SignalWorkspace() {
                 ...current,
                 [view]: {
                   ...current[view],
-                  xScaleSecondsPerDivision: Math.max(0.0005, Math.min(0.05, value)),
+                  xScaleSecondsPerDivision: Math.max(0.0005, Math.min(1, value)),
                 },
               }));
             }}
@@ -800,6 +949,15 @@ export default function SignalWorkspace() {
             onSpectrumDisplayModeChange={setSpectrumDisplayMode}
             onPlayAudio={() => {
               void handlePlayAudio();
+            }}
+            onStartRecording={() => {
+              void handleStartRecording();
+            }}
+            onStopRecording={() => {
+              void handleStopRecording();
+            }}
+            onClearRecordedClip={() => {
+              void handleClearRecordedClip();
             }}
             onStopAudio={() => {
               void handleStopAudio();

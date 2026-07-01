@@ -7,6 +7,9 @@ import type {
 
 export const DEFAULT_MESSAGE_AMPLITUDE = 1;
 export const DEFAULT_MESSAGE_FREQUENCY = 1;
+export const DEFAULT_RECORDING_DURATION_SECONDS = 5;
+export const MIN_RECORDING_DURATION_SECONDS = 1;
+export const MAX_RECORDING_DURATION_SECONDS = 10;
 export const DISPLAY_WINDOW_SECONDS = 0.125;
 export const MIN_SAMPLE_RATE = 48_000;
 export const NYQUIST_MULTIPLIER = 2;
@@ -27,6 +30,8 @@ export const DEFAULT_MESSAGE_COMPONENTS: MessageComponent[] = [
 ];
 
 export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
+  messageSourceMode: "preset",
+  recordingDurationSeconds: DEFAULT_RECORDING_DURATION_SECONDS,
   messageComponents: DEFAULT_MESSAGE_COMPONENTS,
   carrier: {
     amplitude: 1,
@@ -35,6 +40,7 @@ export const DEFAULT_MODULATOR_SETTINGS: ModulatorSettings = {
   },
   modulationIndex: 0.8,
   frequencySensitivity: 250,
+  phaseSensitivity: 1,
 };
 
 export const DEFAULT_PLOT_SETTINGS: PlotSettings = {

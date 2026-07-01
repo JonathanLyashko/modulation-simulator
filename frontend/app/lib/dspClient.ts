@@ -1,6 +1,10 @@
 'use client';
 
-import type { MessageComponent, SsbSideband } from "@/app/components/workspace/types";
+import type {
+  MessageComponent,
+  RecordedMessageClip,
+  SsbSideband,
+} from "@/app/components/workspace/types";
 
 type DspModule = {
   cwrap: <T extends (...args: number[]) => number | void>(
@@ -17,6 +21,8 @@ type DspExports = {
   getSignalLength(signalId: number): number;
   getSignalSampleRate(signalId: number): number;
   getSignalSample(signalId: number, sampleIndex: number): number;
+  setSignalSample(signalId: number, sampleIndex: number, value: number): number;
+  writeSignalSamples(signalId: number, samples: Float32Array): void;
   fftMagnitudeSpectrum(signalId: number): number;
   fftMagnitudeSpectrumSized(signalId: number, fftSize: number): number;
   clearSignal(signalId: number): void;
@@ -59,6 +65,13 @@ type DspExports = {
     frequencySensitivity: number,
     initialPhase: number
   ): number;
+  pmModulate(
+    messageSignalId: number,
+    carrierFrequency: number,
+    carrierAmplitude: number,
+    phaseSensitivity: number,
+    initialPhase: number
+  ): number;
   generateCarrier(
     signalId: number,
     amplitude: number,
@@ -85,6 +98,13 @@ export type SignalBundle = {
   modulated: SignalSnapshot;
 };
 
+type MessageSignalInput = {
+  messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
+  outputLength: number;
+  outputSampleRate: number;
+};
+
 let modulePromise: Promise<DspModule> | null = null;
 
 async function loadModuleFactory() {
@@ -109,77 +129,137 @@ async function getModule() {
 
 export async function createDspClient(): Promise<DspExports> {
   const wasmModule = await getModule();
+  const createSignal: DspExports["createSignal"] = wasmModule.cwrap(
+    "dsp_create_signal",
+    "number",
+    ["number", "number"]
+  );
+  const destroySignal: DspExports["destroySignal"] = wasmModule.cwrap(
+    "dsp_destroy_signal",
+    null,
+    ["number"]
+  );
+  const getSignalPointer: DspExports["getSignalPointer"] = wasmModule.cwrap(
+    "dsp_get_signal_ptr",
+    "number",
+    ["number"]
+  );
+  const getSignalLength: DspExports["getSignalLength"] = wasmModule.cwrap(
+    "dsp_get_signal_length",
+    "number",
+    ["number"]
+  );
+  const getSignalSampleRate: DspExports["getSignalSampleRate"] = wasmModule.cwrap(
+    "dsp_get_signal_sample_rate",
+    "number",
+    ["number"]
+  );
+  const getSignalSample: DspExports["getSignalSample"] = wasmModule.cwrap("dsp_get_signal_sample", "number", [
+    "number",
+    "number",
+  ]);
+  const setSignalSample: DspExports["setSignalSample"] = wasmModule.cwrap(
+    "dsp_set_signal_sample",
+    "number",
+    ["number", "number", "number"]
+  ) as DspExports["setSignalSample"];
+  const fftMagnitudeSpectrum: DspExports["fftMagnitudeSpectrum"] = wasmModule.cwrap("dsp_fft_magnitude_spectrum", "number", [
+    "number",
+  ]);
+  const fftMagnitudeSpectrumSized: DspExports["fftMagnitudeSpectrumSized"] = wasmModule.cwrap(
+    "dsp_fft_magnitude_spectrum_sized",
+    "number",
+    ["number", "number"]
+  );
+  const clearSignal: DspExports["clearSignal"] = wasmModule.cwrap("dsp_clear_signal", null, ["number"]);
+  const addSineComponent: DspExports["addSineComponent"] = wasmModule.cwrap("dsp_add_sine_component", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const addCosineComponent: DspExports["addCosineComponent"] = wasmModule.cwrap("dsp_add_cosine_component", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const amModulate: DspExports["amModulate"] = wasmModule.cwrap("dsp_am_modulate", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const dsbScModulate: DspExports["dsbScModulate"] = wasmModule.cwrap("dsp_dsb_sc_modulate", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const ssbModulate: DspExports["ssbModulate"] = wasmModule.cwrap("dsp_ssb_modulate", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const fmModulate: DspExports["fmModulate"] = wasmModule.cwrap("dsp_fm_modulate", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const pmModulate: DspExports["pmModulate"] = wasmModule.cwrap("dsp_pm_modulate", "number", [
+    "number",
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const generateCarrier: DspExports["generateCarrier"] = wasmModule.cwrap("dsp_generate_carrier", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
+  const generateSine: DspExports["generateSine"] = wasmModule.cwrap("dsp_generate_sine", null, [
+    "number",
+    "number",
+    "number",
+    "number",
+  ]);
 
   return {
-    createSignal: wasmModule.cwrap("dsp_create_signal", "number", ["number", "number"]),
-    destroySignal: wasmModule.cwrap("dsp_destroy_signal", null, ["number"]),
-    getSignalPointer: wasmModule.cwrap("dsp_get_signal_ptr", "number", ["number"]),
-    getSignalLength: wasmModule.cwrap("dsp_get_signal_length", "number", ["number"]),
-    getSignalSampleRate: wasmModule.cwrap("dsp_get_signal_sample_rate", "number", ["number"]),
-    getSignalSample: wasmModule.cwrap("dsp_get_signal_sample", "number", [
-      "number",
-      "number",
-    ]),
-    fftMagnitudeSpectrum: wasmModule.cwrap("dsp_fft_magnitude_spectrum", "number", [
-      "number",
-    ]),
-    fftMagnitudeSpectrumSized: wasmModule.cwrap(
-      "dsp_fft_magnitude_spectrum_sized",
-      "number",
-      ["number", "number"]
-    ),
-    clearSignal: wasmModule.cwrap("dsp_clear_signal", null, ["number"]),
-    addSineComponent: wasmModule.cwrap("dsp_add_sine_component", null, [
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    addCosineComponent: wasmModule.cwrap("dsp_add_cosine_component", null, [
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    amModulate: wasmModule.cwrap("dsp_am_modulate", "number", [
-      "number",
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    dsbScModulate: wasmModule.cwrap("dsp_dsb_sc_modulate", "number", [
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    ssbModulate: wasmModule.cwrap("dsp_ssb_modulate", "number", [
-      "number",
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    fmModulate: wasmModule.cwrap("dsp_fm_modulate", "number", [
-      "number",
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    generateCarrier: wasmModule.cwrap("dsp_generate_carrier", null, [
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
-    generateSine: wasmModule.cwrap("dsp_generate_sine", null, [
-      "number",
-      "number",
-      "number",
-      "number",
-    ]),
+    createSignal,
+    destroySignal,
+    getSignalPointer,
+    getSignalLength,
+    getSignalSampleRate,
+    getSignalSample,
+    setSignalSample,
+    writeSignalSamples(signalId, samples) {
+      const signalLength = getSignalLength(signalId);
+      if (signalLength <= 0) {
+        throw new Error("WASM signal buffer is not available.");
+      }
+      for (let index = 0; index < signalLength; index += 1) {
+        setSignalSample(signalId, index, samples[index] ?? 0);
+      }
+    },
+    fftMagnitudeSpectrum,
+    fftMagnitudeSpectrumSized,
+    clearSignal,
+    addSineComponent,
+    addCosineComponent,
+    amModulate,
+    dsbScModulate,
+    ssbModulate,
+    fmModulate,
+    pmModulate,
+    generateCarrier,
+    generateSine,
   };
 }
 
@@ -202,6 +282,89 @@ export async function readSignalSnapshot(signalId: number): Promise<SignalSnapsh
     sampleRate: actualSampleRate,
     samples,
   };
+}
+
+function renderRecordedMessage(
+  recordedMessage: Pick<RecordedMessageClip, "sampleRate" | "samples">,
+  outputLength: number,
+  outputSampleRate: number
+) {
+  const renderedSamples = new Float32Array(outputLength);
+
+  if (
+    outputLength <= 0 ||
+    outputSampleRate <= 0 ||
+    recordedMessage.sampleRate <= 0 ||
+    recordedMessage.samples.length === 0
+  ) {
+    return renderedSamples;
+  }
+
+  const inputSamples = recordedMessage.samples;
+  const inputLength = inputSamples.length;
+
+  if (inputLength === 1) {
+    renderedSamples.fill(inputSamples[0]);
+    return renderedSamples;
+  }
+
+  const durationSeconds = inputLength / recordedMessage.sampleRate;
+  if (durationSeconds <= 0) {
+    return renderedSamples;
+  }
+
+  for (let index = 0; index < outputLength; index += 1) {
+    const wrappedTimeSeconds = (index / outputSampleRate) % durationSeconds;
+    const sourcePosition = wrappedTimeSeconds * recordedMessage.sampleRate;
+    const lowerIndex = Math.floor(sourcePosition) % inputLength;
+    const upperIndex = (lowerIndex + 1) % inputLength;
+    const blend = sourcePosition - Math.floor(sourcePosition);
+
+    renderedSamples[index] =
+      inputSamples[lowerIndex] * (1 - blend) +
+      inputSamples[upperIndex] * blend;
+  }
+
+  return renderedSamples;
+}
+
+function populateMessageSignal(
+  dsp: DspExports,
+  signalId: number,
+  {
+    messageComponents = [],
+    recordedMessage = null,
+    outputLength,
+    outputSampleRate,
+  }: MessageSignalInput
+) {
+  dsp.clearSignal(signalId);
+
+  if (recordedMessage && recordedMessage.samples.length > 0) {
+    dsp.writeSignalSamples(
+      signalId,
+      renderRecordedMessage(recordedMessage, outputLength, outputSampleRate)
+    );
+    return;
+  }
+
+  for (const component of messageComponents) {
+    if (component.type === "sine") {
+      dsp.addSineComponent(
+        signalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    } else {
+      dsp.addCosineComponent(
+        signalId,
+        component.amplitude,
+        component.frequency,
+        component.phase
+      );
+    }
+  }
 }
 
 export async function generateSineSnapshot(options?: {
@@ -277,6 +440,7 @@ export async function generateDsbLcBundle(options?: {
   length?: number;
   sampleRate?: number;
   messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
   carrierAmplitude?: number;
   carrierFrequency?: number;
   carrierPhase?: number;
@@ -286,6 +450,7 @@ export async function generateDsbLcBundle(options?: {
     length = 4096,
     sampleRate = 4096,
     messageComponents = [],
+    recordedMessage = null,
     carrierAmplitude = 1,
     carrierFrequency = 1000,
     carrierPhase = 0,
@@ -308,24 +473,12 @@ export async function generateDsbLcBundle(options?: {
     throw new Error("Failed to allocate AM signals in the WASM module.");
   }
 
-  dsp.clearSignal(messageSignalId);
-  for (const component of messageComponents) {
-    if (component.type === "sine") {
-      dsp.addSineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    } else {
-      dsp.addCosineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    }
-  }
+  populateMessageSignal(dsp, messageSignalId, {
+    messageComponents,
+    recordedMessage,
+    outputLength: length,
+    outputSampleRate: sampleRate,
+  });
 
   dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
@@ -354,6 +507,7 @@ export async function generateDsbScBundle(options?: {
   length?: number;
   sampleRate?: number;
   messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
   carrierAmplitude?: number;
   carrierFrequency?: number;
   carrierPhase?: number;
@@ -362,6 +516,7 @@ export async function generateDsbScBundle(options?: {
     length = 4096,
     sampleRate = 4096,
     messageComponents = [],
+    recordedMessage = null,
     carrierAmplitude = 1,
     carrierFrequency = 1000,
     carrierPhase = 0,
@@ -383,24 +538,12 @@ export async function generateDsbScBundle(options?: {
     throw new Error("Failed to allocate DSB-SC signals in the WASM module.");
   }
 
-  dsp.clearSignal(messageSignalId);
-  for (const component of messageComponents) {
-    if (component.type === "sine") {
-      dsp.addSineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    } else {
-      dsp.addCosineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    }
-  }
+  populateMessageSignal(dsp, messageSignalId, {
+    messageComponents,
+    recordedMessage,
+    outputLength: length,
+    outputSampleRate: sampleRate,
+  });
 
   dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
@@ -428,6 +571,7 @@ export async function generateSsbBundle(options?: {
   length?: number;
   sampleRate?: number;
   messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
   carrierAmplitude?: number;
   carrierFrequency?: number;
   carrierPhase?: number;
@@ -437,6 +581,7 @@ export async function generateSsbBundle(options?: {
     length = 4096,
     sampleRate = 4096,
     messageComponents = [],
+    recordedMessage = null,
     carrierAmplitude = 1,
     carrierFrequency = 1000,
     carrierPhase = 0,
@@ -459,24 +604,12 @@ export async function generateSsbBundle(options?: {
     throw new Error("Failed to allocate SSB signals in the WASM module.");
   }
 
-  dsp.clearSignal(messageSignalId);
-  for (const component of messageComponents) {
-    if (component.type === "sine") {
-      dsp.addSineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    } else {
-      dsp.addCosineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    }
-  }
+  populateMessageSignal(dsp, messageSignalId, {
+    messageComponents,
+    recordedMessage,
+    outputLength: length,
+    outputSampleRate: sampleRate,
+  });
 
   dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
@@ -505,6 +638,7 @@ export async function generateFmBundle(options?: {
   length?: number;
   sampleRate?: number;
   messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
   carrierAmplitude?: number;
   carrierFrequency?: number;
   carrierPhase?: number;
@@ -514,6 +648,7 @@ export async function generateFmBundle(options?: {
     length = 4096,
     sampleRate = 4096,
     messageComponents = [],
+    recordedMessage = null,
     carrierAmplitude = 1,
     carrierFrequency = 1000,
     carrierPhase = 0,
@@ -536,24 +671,12 @@ export async function generateFmBundle(options?: {
     throw new Error("Failed to allocate FM signals in the WASM module.");
   }
 
-  dsp.clearSignal(messageSignalId);
-  for (const component of messageComponents) {
-    if (component.type === "sine") {
-      dsp.addSineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    } else {
-      dsp.addCosineComponent(
-        messageSignalId,
-        component.amplitude,
-        component.frequency,
-        component.phase
-      );
-    }
-  }
+  populateMessageSignal(dsp, messageSignalId, {
+    messageComponents,
+    recordedMessage,
+    outputLength: length,
+    outputSampleRate: sampleRate,
+  });
 
   dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
 
@@ -569,6 +692,73 @@ export async function generateFmBundle(options?: {
     dsp.destroySignal(messageSignalId);
     dsp.destroySignal(carrierSignalId);
     throw new Error("Failed to generate FM signal in the WASM module.");
+  }
+
+  return {
+    message: await readSignalSnapshot(messageSignalId),
+    carrier: await readSignalSnapshot(carrierSignalId),
+    modulated: await readSignalSnapshot(modulatedSignalId),
+  };
+}
+
+export async function generatePmBundle(options?: {
+  length?: number;
+  sampleRate?: number;
+  messageComponents?: MessageComponent[];
+  recordedMessage?: Pick<RecordedMessageClip, "sampleRate" | "samples"> | null;
+  carrierAmplitude?: number;
+  carrierFrequency?: number;
+  carrierPhase?: number;
+  phaseSensitivity?: number;
+}): Promise<SignalBundle> {
+  const {
+    length = 4096,
+    sampleRate = 4096,
+    messageComponents = [],
+    recordedMessage = null,
+    carrierAmplitude = 1,
+    carrierFrequency = 1000,
+    carrierPhase = 0,
+    phaseSensitivity = 1,
+  } = options ?? {};
+  const dsp = await createDspClient();
+
+  const messageSignalId = dsp.createSignal(length, sampleRate);
+  const carrierSignalId = dsp.createSignal(length, sampleRate);
+
+  if (messageSignalId < 0 || carrierSignalId < 0) {
+    if (messageSignalId >= 0) {
+      dsp.destroySignal(messageSignalId);
+    }
+
+    if (carrierSignalId >= 0) {
+      dsp.destroySignal(carrierSignalId);
+    }
+
+    throw new Error("Failed to allocate PM signals in the WASM module.");
+  }
+
+  populateMessageSignal(dsp, messageSignalId, {
+    messageComponents,
+    recordedMessage,
+    outputLength: length,
+    outputSampleRate: sampleRate,
+  });
+
+  dsp.generateCarrier(carrierSignalId, carrierAmplitude, carrierFrequency, carrierPhase);
+
+  const modulatedSignalId = dsp.pmModulate(
+    messageSignalId,
+    carrierFrequency,
+    carrierAmplitude,
+    phaseSensitivity,
+    carrierPhase
+  );
+
+  if (modulatedSignalId < 0) {
+    dsp.destroySignal(messageSignalId);
+    dsp.destroySignal(carrierSignalId);
+    throw new Error("Failed to generate PM signal in the WASM module.");
   }
 
   return {

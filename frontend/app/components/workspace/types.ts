@@ -5,6 +5,7 @@ export type OscillatorSettings = {
 };
 
 export type MessageComponentType = "sine" | "cosine";
+export type MessageSourceMode = "preset" | "recorded";
 
 export type MessageComponent = {
   id: string;
@@ -15,10 +16,13 @@ export type MessageComponent = {
 };
 
 export type ModulatorSettings = {
+  messageSourceMode: MessageSourceMode;
+  recordingDurationSeconds: number;
   messageComponents: MessageComponent[];
   carrier: OscillatorSettings;
   modulationIndex: number;
   frequencySensitivity: number;
+  phaseSensitivity: number;
 };
 
 export type PlotSignalSettings = {
@@ -40,6 +44,13 @@ export type SignalSnapshot = {
   signalId: number;
   sampleRate: number;
   samples: Float32Array;
+};
+
+export type RecordedMessageClip = {
+  samples: Float32Array;
+  sampleRate: number;
+  durationSeconds: number;
+  peak: number;
 };
 
 export type SignalView = "message" | "carrier" | "modulated";
