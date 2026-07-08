@@ -1463,12 +1463,6 @@ export default function InspectorPanel({
         </CollapsibleSection>
       </div>
 
-      <div className="border-t border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface)] p-3 font-mono text-[11px] text-[color:var(--ui-outline)]">
-        <div className="flex justify-between">
-          <span>CPU LOAD: 12%</span>
-          <span>BUFFER: OK</span>
-        </div>
-      </div>
     </aside>
   );
 }
