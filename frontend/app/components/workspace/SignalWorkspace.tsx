@@ -22,15 +22,19 @@ import BlockCanvas from "./BlockCanvas";
 import BottomPanels from "./BottomPanels";
 import {
   DEFAULT_FFT_SIZE,
+  DEFAULT_FREQUENCY_DB_SCALE,
+  DEFAULT_FREQUENCY_MAGNITUDE_SCALE,
   DEFAULT_FREQUENCY_PLOT_SETTINGS,
   DEFAULT_MESSAGE_COMPONENTS,
   DEFAULT_MODULATOR_SETTINGS,
   DEFAULT_PLOT_SETTINGS,
   DISPLAY_WINDOW_SECONDS,
   MAX_RECORDING_DURATION_SECONDS,
+  MAX_CARRIER_FREQUENCY,
   MIN_SAMPLE_RATE,
   MIN_RECORDING_DURATION_SECONDS,
   NYQUIST_MULTIPLIER,
+  RECORDED_MESSAGE_MAX_BANDWIDTH_HZ,
   SAMPLES_PER_HIGHEST_FREQUENCY_CYCLE,
 } from "./constants";
 import InspectorPanel from "./InspectorPanel";
@@ -94,13 +98,30 @@ function createDefaultFrequencyPlotSettings(
   };
 }
 
+function normalizeFrequencyPlotScale(
+  yScale: number,
+  mode: SpectrumDisplayMode
+) {
+  if (mode === "db") {
+    return yScale < 1
+      ? DEFAULT_FREQUENCY_DB_SCALE
+      : Math.max(1, Math.min(40, yScale));
+  }
+
+  return yScale > 2
+    ? DEFAULT_FREQUENCY_MAGNITUDE_SCALE
+    : Math.max(0.02, Math.min(2, yScale));
+}
+
 const SUPPORTED_AMPLITUDE_SCHEMES: AnalogAmplitudeScheme[] = ["DSB-LC", "DSB-SC", "SSB"];
 
 export default function SignalWorkspace() {
   const activeSignalIdsRef = useRef<number[]>([]);
   const playbackIntervalRef = useRef<number | null>(null);
   const recordingTimeoutRef = useRef<number | null>(null);
+  const recordingIntervalRef = useRef<number | null>(null);
   const playbackStartedAtRef = useRef<number | null>(null);
+  const recordingStartedAtRef = useRef<number | null>(null);
   const playbackDurationRef = useRef<number>(0);
   const activePlaybackSignalIdRef = useRef<number | null>(null);
 
@@ -114,7 +135,6 @@ export default function SignalWorkspace() {
     carrier: null,
     modulated: null,
   });
-  const [isRunning, setIsRunning] = useState(true);
   const [activeAmplitudeScheme, setActiveAmplitudeScheme] =
     useState<AnalogAmplitudeScheme>("DSB-LC");
   const [activeAngleScheme, setActiveAngleScheme] =
@@ -149,6 +169,7 @@ export default function SignalWorkspace() {
     "idle" | "recording" | "processing"
   >("idle");
   const [recordingStatus, setRecordingStatus] = useState("No recorded clip");
+  const [recordingProgressSeconds, setRecordingProgressSeconds] = useState(0);
   const [playbackCursorSeconds, setPlaybackCursorSeconds] = useState<number | null>(
     null
   );
@@ -159,7 +180,10 @@ export default function SignalWorkspace() {
 
   const recordedMessageBandwidthHz =
     settings.messageSourceMode === "recorded" && recordedMessageClip
-      ? recordedMessageClip.sampleRate / 2
+      ? Math.min(
+          recordedMessageClip.sampleRate / 2,
+          RECORDED_MESSAGE_MAX_BANDWIDTH_HZ
+        )
       : 0;
   const requestedWindowSeconds = Math.max(
     DISPLAY_WINDOW_SECONDS,
@@ -233,6 +257,10 @@ export default function SignalWorkspace() {
     ...frequencyPlotSettings,
     spanHz: boundedFrequencySpan,
     centerHz: boundedFrequencyCenter,
+    yScale: normalizeFrequencyPlotScale(
+      frequencyPlotSettings.yScale,
+      spectrumDisplayMode
+    ),
   };
   const displayedSignals = supportsCurrentModulation
     ? signalByView
@@ -413,6 +441,9 @@ export default function SignalWorkspace() {
       if (recordingTimeoutRef.current !== null) {
         window.clearTimeout(recordingTimeoutRef.current);
       }
+      if (recordingIntervalRef.current !== null) {
+        window.clearInterval(recordingIntervalRef.current);
+      }
       if (activeSignalIdsRef.current.length === 0) {
         return;
       }
@@ -444,6 +475,13 @@ export default function SignalWorkspace() {
     if (recordingTimeoutRef.current !== null) {
       window.clearTimeout(recordingTimeoutRef.current);
       recordingTimeoutRef.current = null;
+    }
+  }
+
+  function clearRecordingProgressTimer() {
+    if (recordingIntervalRef.current !== null) {
+      window.clearInterval(recordingIntervalRef.current);
+      recordingIntervalRef.current = null;
     }
   }
 
@@ -553,14 +591,31 @@ export default function SignalWorkspace() {
     try {
       await handleStopAudio();
       clearRecordingTimer();
+      clearRecordingProgressTimer();
+      recordingStartedAtRef.current = performance.now();
+      setRecordingProgressSeconds(0);
       setRecordingState("recording");
       setRecordingStatus("Recording from microphone");
       await startAudioRecording();
+      recordingIntervalRef.current = window.setInterval(() => {
+        if (recordingStartedAtRef.current === null) {
+          return;
+        }
+
+        const elapsedSeconds =
+          (performance.now() - recordingStartedAtRef.current) / 1000;
+        setRecordingProgressSeconds(
+          Math.min(elapsedSeconds, settings.recordingDurationSeconds)
+        );
+      }, 50);
       recordingTimeoutRef.current = window.setTimeout(() => {
         void handleStopRecording();
       }, settings.recordingDurationSeconds * 1000);
     } catch (cause) {
       clearRecordingTimer();
+      clearRecordingProgressTimer();
+      recordingStartedAtRef.current = null;
+      setRecordingProgressSeconds(0);
       setRecordingState("idle");
       setRecordingStatus(
         cause instanceof Error ? cause.message : "Microphone recording failed"
@@ -570,6 +625,7 @@ export default function SignalWorkspace() {
 
   async function handleStopRecording() {
     clearRecordingTimer();
+    clearRecordingProgressTimer();
 
     try {
       setRecordingState("processing");
@@ -578,6 +634,8 @@ export default function SignalWorkspace() {
 
       setRecordedMessageClip(clip);
       setRecordingState("idle");
+      recordingStartedAtRef.current = null;
+      setRecordingProgressSeconds(clip.durationSeconds);
       setRecordingStatus(
         `Recorded ${clip.durationSeconds.toFixed(2)} s at ${clip.sampleRate.toFixed(0)} Hz`
       );
@@ -597,6 +655,8 @@ export default function SignalWorkspace() {
         },
       }));
     } catch (cause) {
+      recordingStartedAtRef.current = null;
+      setRecordingProgressSeconds(0);
       setRecordingState("idle");
       setRecordingStatus(
         cause instanceof Error ? cause.message : "Microphone recording failed"
@@ -606,42 +666,24 @@ export default function SignalWorkspace() {
 
   async function handleClearRecordedClip() {
     clearRecordingTimer();
+    clearRecordingProgressTimer();
     await cancelAudioRecording();
+    recordingStartedAtRef.current = null;
     setRecordingState("idle");
+    setRecordingProgressSeconds(0);
     setRecordedMessageClip(null);
     setRecordingStatus("No recorded clip");
   }
 
+  const recordingProgressRatio =
+    settings.recordingDurationSeconds > 0
+      ? Math.max(0, Math.min(1, recordingProgressSeconds / settings.recordingDurationSeconds))
+      : 0;
+
   return (
     <div className="min-h-screen bg-[color:var(--ui-background)] p-0 text-[color:var(--ui-text)]">
-      <div className="flex h-screen flex-col overflow-hidden rounded-[18px] border border-[#b9bec8] bg-white shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
+      <div className="relative flex h-screen flex-col overflow-hidden rounded-[18px] border border-[#b9bec8] bg-white shadow-[0_1px_0_rgba(255,255,255,0.8)_inset]">
         <TopBar
-          isRunning={isRunning}
-          onRun={() => {
-            setIsRunning(true);
-          }}
-          onPause={() => {
-            setIsRunning(false);
-          }}
-          onReset={() => {
-            clearRecordingTimer();
-            void cancelAudioRecording();
-            setIsRunning(true);
-            setSettings(cloneDefaultModulatorSettings());
-            setRecordedMessageClip(null);
-            setRecordingState("idle");
-            setRecordingStatus("No recorded clip");
-            setPlotSettings(DEFAULT_PLOT_SETTINGS);
-            setFrequencyPlotSettings(
-              createDefaultFrequencyPlotSettings(
-                DEFAULT_MODULATOR_SETTINGS.carrier.frequency,
-                DEFAULT_MESSAGE_COMPONENTS.reduce(
-                  (maximum, component) => Math.max(maximum, component.frequency),
-                  0
-                )
-              )
-            );
-          }}
         />
 
         <div className="flex min-h-0 flex-1 overflow-hidden">
@@ -702,6 +744,7 @@ export default function SignalWorkspace() {
             audioStatus={audioStatus}
             messageSourceMode={settings.messageSourceMode}
             recordingDurationSeconds={settings.recordingDurationSeconds}
+            recordingProgressSeconds={recordingProgressSeconds}
             recordedMessageClip={recordedMessageClip}
             recordingState={recordingState}
             recordingStatus={recordingStatus}
@@ -725,7 +768,7 @@ export default function SignalWorkspace() {
                   ...current,
                   carrier: {
                     ...current.carrier,
-                    frequency: Math.max(100, Math.min(5000, value)),
+                    frequency: Math.max(100, Math.min(MAX_CARRIER_FREQUENCY, value)),
                   },
                 }));
               }
@@ -934,19 +977,29 @@ export default function SignalWorkspace() {
             }}
             onResetSignals={() => {
               setSettings(cloneDefaultModulatorSettings());
-              setIsRunning(true);
             }}
             onResetPlot={() => {
               setPlotSettings(DEFAULT_PLOT_SETTINGS);
-              setFrequencyPlotSettings(
-                createDefaultFrequencyPlotSettings(
-                  settings.carrier.frequency,
-                  highestMessageFrequency
-                )
+              const defaults = createDefaultFrequencyPlotSettings(
+                settings.carrier.frequency,
+                highestMessageFrequency
               );
+              setFrequencyPlotSettings({
+                ...defaults,
+                yScale:
+                  spectrumDisplayMode === "db"
+                    ? DEFAULT_FREQUENCY_DB_SCALE
+                    : defaults.yScale,
+              });
             }}
             spectrumDisplayMode={spectrumDisplayMode}
-            onSpectrumDisplayModeChange={setSpectrumDisplayMode}
+            onSpectrumDisplayModeChange={(mode) => {
+              setSpectrumDisplayMode(mode);
+              setFrequencyPlotSettings((current) => ({
+                ...current,
+                yScale: normalizeFrequencyPlotScale(current.yScale, mode),
+              }));
+            }}
             onPlayAudio={() => {
               void handlePlayAudio();
             }}
@@ -967,6 +1020,39 @@ export default function SignalWorkspace() {
             }}
           />
         </div>
+        {recordingState === "recording" ? (
+          <div className="pointer-events-none absolute inset-0 z-40 flex items-center justify-center bg-slate-900/12">
+            <div className="flex min-w-[280px] flex-col items-center gap-4 rounded-[22px] border border-white/70 bg-white/88 px-8 py-6 shadow-[0_24px_64px_rgba(15,23,42,0.2)] backdrop-blur-sm">
+              <div className="relative flex h-10 w-10 items-center justify-center">
+                <span className="absolute inline-flex h-10 w-10 animate-ping rounded-full bg-red-500/25" />
+                <span className="h-4 w-4 rounded-full bg-red-500 shadow-[0_0_0_10px_rgba(239,68,68,0.14)]" />
+              </div>
+              <div className="text-center">
+                <p className="text-[11px] font-semibold uppercase tracking-[0.28em] text-[#7b8191]">
+                  Recording In Progress
+                </p>
+                <p className="mt-2 text-sm text-[#3e4656]">
+                  Capturing microphone input for the message signal.
+                </p>
+              </div>
+              <div className="w-[260px]">
+                <div className="mb-2 flex items-center justify-between text-[12px] font-medium text-[#586174]">
+                  <span>Progress</span>
+                  <span>
+                    {recordingProgressSeconds.toFixed(2)} /{" "}
+                    {settings.recordingDurationSeconds.toFixed(0)} s
+                  </span>
+                </div>
+                <div className="h-2 overflow-hidden rounded-full bg-[#d9dfeb]">
+                  <div
+                    className="h-full rounded-full bg-[color:var(--ui-primary)] transition-[width] duration-75"
+                    style={{ width: `${recordingProgressRatio * 100}%` }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+        ) : null}
       </div>
     </div>
   );

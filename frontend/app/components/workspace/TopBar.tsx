@@ -1,78 +1,58 @@
+import Image from "next/image";
+import Link from "next/link";
+
 type TopBarProps = {
-  isRunning: boolean;
-  onRun: () => void;
-  onPause: () => void;
-  onReset: () => void;
+  activePage?: "workspace" | "learn" | "documentation";
+  referenceBadgeText?: string | null;
 };
 
-function ToolbarButton({
-  label,
-  active = false,
-  onClick,
-}: {
-  label: string;
-  active?: boolean;
-  onClick?: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={[
-        "rounded-[3px] border px-4 py-2 text-sm font-semibold transition-colors",
-        active
-          ? "border-[color:var(--ui-primary)] bg-[color:var(--ui-primary)] text-white"
-          : "border-transparent bg-[color:var(--ui-surface-high)] text-[color:var(--ui-text)] hover:bg-[#e7ebf1]",
-      ].join(" ")}
-    >
-      {label}
-    </button>
-  );
+function navItemClass(isActive: boolean) {
+  return isActive
+    ? "border-b-[3px] border-[color:var(--ui-primary)] px-2 py-[19px] text-sm font-semibold text-[color:var(--ui-primary)]"
+    : "px-2 py-[19px] text-sm text-[color:var(--ui-text)] transition-colors hover:text-[color:var(--ui-primary)]";
 }
 
 export default function TopBar({
-  isRunning,
-  onRun,
-  onPause,
-  onReset,
+  activePage = "workspace",
+  referenceBadgeText = null,
 }: TopBarProps) {
   return (
     <header className="flex h-16 items-center justify-between border-b border-[color:var(--ui-outline-variant)] bg-[color:var(--ui-surface-highest)] px-6">
       <div className="flex items-center gap-6">
-        <div className="pr-5 border-r border-[color:var(--ui-outline-variant)]">
+        <div className="flex items-center gap-3 border-r border-[color:var(--ui-outline-variant)] pr-5">
+          <Image
+            src="/images/signal-lab-logo.png"
+            alt="Precision Signal Lab logo"
+            width={36}
+            height={36}
+            className="h-9 w-9 rounded-[8px] object-cover"
+            priority
+          />
           <p className="text-[18px] font-semibold tracking-tight text-[color:var(--ui-primary)]">
-            Precision Signal Lab
+            Signal Lab
           </p>
         </div>
         <nav className="flex items-center gap-4">
-          <button
-            type="button"
-            className="border-b-[3px] border-[color:var(--ui-primary)] px-2 py-[19px] text-sm font-semibold text-[color:var(--ui-primary)]"
-          >
+          <Link href="/" className={navItemClass(activePage === "workspace")}>
             Workspace
-          </button>
-          <button
-            type="button"
-            className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
-          >
+          </Link>
+          <Link href="/learn" className={navItemClass(activePage === "learn")}>
             Learn
-          </button>
-          <button
-            type="button"
-            className="px-2 py-[19px] text-sm text-[color:var(--ui-text)]"
+          </Link>
+          <Link
+            href="/documentation"
+            className={navItemClass(activePage === "documentation")}
           >
             Documentation
-          </button>
+          </Link>
         </nav>
       </div>
 
-      <div className="flex items-center gap-2">
-        <ToolbarButton label="Run" active={isRunning} onClick={onRun} />
-        <ToolbarButton label="Pause" onClick={onPause} />
-        <button type="button" onClick={onReset} className="px-3 py-2 text-[color:var(--ui-text)]">⟳</button>
-        <button type="button" className="px-3 py-2 text-[color:var(--ui-text)]">↓</button>
-        <button type="button" className="px-3 py-2 text-[color:var(--ui-text)]">💾</button>
-      </div>
+      {referenceBadgeText ? (
+        <div className="rounded-[3px] border border-[color:var(--ui-outline-variant)] bg-white px-4 py-2 text-sm text-[color:var(--ui-text-muted)]">
+          {referenceBadgeText}
+        </div>
+      ) : null}
     </header>
   );
 }

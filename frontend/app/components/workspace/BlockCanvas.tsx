@@ -125,8 +125,9 @@ export default function BlockCanvas({
 
   return (
     <div className="relative flex-1 overflow-hidden bg-[radial-gradient(circle,_var(--ui-dot-grid)_1.1px,_transparent_1.1px)] [background-size:20px_20px]">
-      <div className="absolute inset-0 flex items-center justify-center overflow-auto p-8">
-        <div className="flex min-w-[1120px] items-center gap-12">
+      <div className="absolute inset-0 overflow-auto">
+        <div className="flex min-h-full min-w-max items-center px-16 py-8">
+          <div className="flex min-w-[1120px] items-center gap-12 pr-20">
           <SignalBlock
             nodeLabel="MESSAGE"
             title="Message Signal"
@@ -150,6 +151,7 @@ export default function BlockCanvas({
           <UtilityBlock title="Channel" />
           <Arrow />
           <UtilityBlock title="Demodulator" />
+          </div>
         </div>
       </div>
     </div>

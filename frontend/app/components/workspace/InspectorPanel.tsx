@@ -4,6 +4,7 @@ import { useState } from "react";
 import type { ReactNode } from "react";
 
 import { FFT_SIZE_OPTIONS } from "./constants";
+import { MAX_CARRIER_FREQUENCY } from "./constants";
 import type {
   AnalogAngleScheme,
   AnalogAmplitudeScheme,
@@ -35,6 +36,7 @@ type InspectorPanelProps = {
   audioStatus: string;
   messageSourceMode: MessageSourceMode;
   recordingDurationSeconds: number;
+  recordingProgressSeconds: number;
   recordedMessageClip: RecordedMessageClip | null;
   recordingState: "idle" | "recording" | "processing";
   recordingStatus: string;
@@ -75,6 +77,33 @@ type InspectorPanelProps = {
   onStopAudio: () => void;
   onToggleCollapsed: () => void;
 };
+
+function ChevronIcon({
+  direction,
+  className = "",
+}: {
+  direction: "left" | "right";
+  className?: string;
+}) {
+  const rotationClass = direction === "left" ? "rotate-180" : "";
+
+  return (
+    <svg
+      viewBox="0 0 12 12"
+      aria-hidden="true"
+      className={`h-3.5 w-3.5 ${rotationClass} ${className}`.trim()}
+      fill="none"
+    >
+      <path
+        d="M4 2.5L7.5 6L4 9.5"
+        stroke="currentColor"
+        strokeWidth="1.7"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
 
 function RangeField({
   title,
@@ -240,6 +269,7 @@ function MessageSourceModeToggle({
 
 function RecordedMessageSection({
   recordingDurationSeconds,
+  recordingProgressSeconds,
   recordedMessageClip,
   recordingState,
   recordingStatus,
@@ -249,6 +279,7 @@ function RecordedMessageSection({
   onClearRecordedClip,
 }: {
   recordingDurationSeconds: number;
+  recordingProgressSeconds: number;
   recordedMessageClip: RecordedMessageClip | null;
   recordingState: "idle" | "recording" | "processing";
   recordingStatus: string;
@@ -257,6 +288,11 @@ function RecordedMessageSection({
   onStopRecording: () => void;
   onClearRecordedClip: () => void;
 }) {
+  const progressRatio =
+    recordingDurationSeconds > 0
+      ? Math.max(0, Math.min(1, recordingProgressSeconds / recordingDurationSeconds))
+      : 0;
+
   return (
     <div className="space-y-4">
       <div className="rounded-[6px] border border-[color:var(--ui-outline-variant)] bg-white p-3">
@@ -271,6 +307,22 @@ function RecordedMessageSection({
         <div className="mt-2 text-xs text-[color:var(--ui-text-muted)]">
           {recordingStatus}
         </div>
+        {recordingState === "recording" ? (
+          <div className="mt-3 space-y-2">
+            <div className="flex items-center justify-between text-xs text-[color:var(--ui-text-muted)]">
+              <span>Recording progress</span>
+              <span>
+                {recordingProgressSeconds.toFixed(2)} / {recordingDurationSeconds.toFixed(0)} s
+              </span>
+            </div>
+            <div className="h-2 overflow-hidden rounded-full bg-[color:var(--ui-surface-highest)]">
+              <div
+                className="h-full rounded-full bg-[color:var(--ui-primary)] transition-[width] duration-75"
+                style={{ width: `${progressRatio * 100}%` }}
+              />
+            </div>
+          </div>
+        ) : null}
       </div>
 
       <RangeField
@@ -950,6 +1002,7 @@ export default function InspectorPanel({
   audioStatus,
   messageSourceMode,
   recordingDurationSeconds,
+  recordingProgressSeconds,
   recordedMessageClip,
   recordingState,
   recordingStatus,
@@ -1005,7 +1058,7 @@ export default function InspectorPanel({
           aria-label="Expand right sidebar"
           title="Expand inspector"
         >
-          &lt;
+          <ChevronIcon direction="right" />
         </button>
         <div className="rounded-[8px] border border-[color:var(--ui-outline-variant)] bg-white px-2 py-3 text-center">
           <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-[color:var(--ui-outline)]">
@@ -1032,7 +1085,7 @@ export default function InspectorPanel({
           aria-label="Collapse right sidebar"
           title="Collapse inspector"
         >
-          &gt;
+          <ChevronIcon direction="left" />
         </button>
       </div>
 
@@ -1040,8 +1093,8 @@ export default function InspectorPanel({
         <CollapsibleSection title="Carrier Settings">
           <OscillatorSection
             settings={settings.carrier}
-            frequencyRange={{ min: 100, max: 5000 }}
-            frequencyStep={50}
+            frequencyRange={{ min: 100, max: MAX_CARRIER_FREQUENCY }}
+            frequencyStep={100}
             onAmplitudeChange={onCarrierAmplitudeChange}
             onFrequencyChange={onCarrierFrequencyChange}
             onPhaseChange={onCarrierPhaseChange}
@@ -1092,6 +1145,7 @@ export default function InspectorPanel({
           ) : (
             <RecordedMessageSection
               recordingDurationSeconds={recordingDurationSeconds}
+              recordingProgressSeconds={recordingProgressSeconds}
               recordedMessageClip={recordedMessageClip}
               recordingState={recordingState}
               recordingStatus={recordingStatus}

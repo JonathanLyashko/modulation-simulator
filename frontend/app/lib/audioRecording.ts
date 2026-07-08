@@ -1,5 +1,9 @@
 'use client';
 
+import {
+  RECORDED_MESSAGE_MAX_BANDWIDTH_HZ,
+  RECORDED_MESSAGE_TARGET_SAMPLE_RATE,
+} from "@/app/components/workspace/constants";
 import type { RecordedMessageClip } from "@/app/components/workspace/types";
 
 let audioContextPromise: Promise<AudioContext> | null = null;
@@ -64,6 +68,31 @@ function extractMonoSamples(audioBuffer: AudioBuffer) {
     samples: monoSamples,
     peak,
   };
+}
+
+async function bandLimitRecordedAudio(audioBuffer: AudioBuffer) {
+  const targetSampleRate = Math.max(
+    RECORDED_MESSAGE_TARGET_SAMPLE_RATE,
+    RECORDED_MESSAGE_MAX_BANDWIDTH_HZ * 2
+  );
+  const targetLength = Math.max(
+    1,
+    Math.ceil(audioBuffer.duration * targetSampleRate)
+  );
+  const offlineContext = new OfflineAudioContext(1, targetLength, targetSampleRate);
+  const source = offlineContext.createBufferSource();
+  const lowpassFilter = offlineContext.createBiquadFilter();
+
+  lowpassFilter.type = "lowpass";
+  lowpassFilter.frequency.value = RECORDED_MESSAGE_MAX_BANDWIDTH_HZ;
+  lowpassFilter.Q.value = 0.707;
+
+  source.buffer = audioBuffer;
+  source.connect(lowpassFilter);
+  lowpassFilter.connect(offlineContext.destination);
+  source.start();
+
+  return offlineContext.startRendering();
 }
 
 export async function cancelAudioRecording() {
@@ -134,12 +163,13 @@ export async function startAudioRecording() {
         const arrayBuffer = await blob.arrayBuffer();
         const audioContext = await getAudioContext();
         const audioBuffer = await audioContext.decodeAudioData(arrayBuffer.slice(0));
-        const monoSignal = extractMonoSamples(audioBuffer);
+        const processedAudioBuffer = await bandLimitRecordedAudio(audioBuffer);
+        const monoSignal = extractMonoSamples(processedAudioBuffer);
 
         resolve({
           samples: monoSignal.samples,
-          sampleRate: audioBuffer.sampleRate,
-          durationSeconds: audioBuffer.duration,
+          sampleRate: processedAudioBuffer.sampleRate,
+          durationSeconds: processedAudioBuffer.duration,
           peak: monoSignal.peak,
         });
       } catch (cause) {

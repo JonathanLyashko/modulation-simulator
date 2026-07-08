@@ -83,12 +83,28 @@ function drawSpectrum(
   const verticalRange = Math.max(yScale * GRID_DIVISIONS, 1e-6);
   const renderDiscreteBins = renderedPointCount <= 160;
   const points: Array<{ x: number; y: number }> = [];
+  const dbValues: number[] = [];
 
   let peakDb = -120;
   if (mode === "db") {
     for (let index = minIndex; index <= maxIndex; index += stride) {
-      peakDb = Math.max(peakDb, 20 * Math.log10(Math.max(samples[index], 1e-6)));
+      const dbValue = 20 * Math.log10(Math.max(samples[index], 1e-6));
+      dbValues.push(dbValue);
+      peakDb = Math.max(peakDb, dbValue);
     }
+  }
+  let topDb = peakDb + yScale;
+  let bottomDb = topDb - verticalRange;
+  if (mode === "db" && dbValues.length > 0) {
+    const sortedDbValues = [...dbValues].sort((left, right) => left - right);
+    const floorIndex = Math.max(
+      0,
+      Math.min(sortedDbValues.length - 1, Math.floor((sortedDbValues.length - 1) * 0.15))
+    );
+    const floorDb = sortedDbValues[floorIndex];
+    const contentCenterDb = (peakDb + floorDb) / 2;
+    topDb = contentCenterDb + verticalRange / 2;
+    bottomDb = contentCenterDb - verticalRange / 2;
   }
 
   for (let pointIndex = 0; pointIndex < renderedPointCount; pointIndex += 1) {
@@ -102,8 +118,9 @@ function drawSpectrum(
       y = height - normalizedMagnitude * height;
     } else {
       const dbValue = 20 * Math.log10(Math.max(samples[sampleIndex], 1e-6));
-      const relativeDb = Math.max(peakDb - dbValue, 0);
-      y = Math.min((relativeDb / verticalRange) * height, height);
+      const normalizedDb =
+        (topDb - dbValue) / Math.max(topDb - bottomDb, 1e-6);
+      y = Math.min(Math.max(normalizedDb * height, 0), height);
     }
 
     points.push({ x, y });
